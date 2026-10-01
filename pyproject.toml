@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mini-ai"
+version = "0.1.0"
+description = "A private multi-tenant Mini AI companion with Vault Zeta continuity"
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.142,<0.143",
+  "httpx>=0.28,<0.29",
+  "httpx2>=2.13,<2.14",
+  "mcp>=2.2,<2.3",
+  "pydantic-settings>=2.15,<2.16",
+  "uvicorn[standard]>=0.54,<0.55",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3,<10",
+  "pytest-asyncio>=0.24,<2",
+  "ruff>=0.9,<1",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+miniai = ["static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "ASYNC"]

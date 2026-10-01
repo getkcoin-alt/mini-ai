@@ -1,0 +1,11 @@
+.git
+.github
+.railway
+.env
+.venv
+.pytest_cache
+.ruff_cache
+node_modules
+tests
+data
+*.sqlite3
