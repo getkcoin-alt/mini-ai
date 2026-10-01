@@ -59,7 +59,6 @@ Recommended private-network variables when Mini and Vault Zeta are in the same R
 ```text
 APP_ENV=production
 MINI_DATA_DIR=/data
-MINI_PUBLIC_URL=https://${{RAILWAY_PUBLIC_DOMAIN}}
 MINI_ADMIN_API_KEY=<random secret>
 LLM_BASE_URL=${{api.LLM_BASE_URL}}
 LLM_API_KEY=${{api.LLM_API_KEY}}

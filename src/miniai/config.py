@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     mini_admin_api_key: str = ""
     mini_data_dir: Path = Path("data")
     mini_public_url: str = ""
+    railway_public_domain: str = ""
 
     llm_base_url: str = ""
     llm_api_key: str = ""
@@ -37,6 +38,14 @@ class Settings(BaseSettings):
     @property
     def vault_configured(self) -> bool:
         return bool(self.vault_mcp_url and self.vault_api_key)
+
+    @property
+    def public_url(self) -> str:
+        if self.mini_public_url:
+            return self.mini_public_url.rstrip("/")
+        if self.railway_public_domain:
+            return f"https://{self.railway_public_domain}"
+        return ""
 
 
 @lru_cache

@@ -164,7 +164,7 @@ def create_app(
             )
         except ValueError as exc:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
-        base = cfg.mini_public_url.rstrip("/") or str(request.base_url).rstrip("/")
+        base = cfg.public_url or str(request.base_url).rstrip("/")
         return {
             "slug": tenant.slug,
             "owner_name": tenant.owner_name,
