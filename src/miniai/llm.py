@@ -19,6 +19,21 @@ class CompanionLLM:
     def configured(self) -> bool:
         return bool(self.base_url and self.api_key and self.model)
 
+    async def check(self) -> None:
+        """Verify that the configured OpenAI-compatible provider accepts auth."""
+        if not self.configured:
+            raise LLMUnavailable("Mini's language model is not configured")
+        try:
+            async with httpx.AsyncClient(timeout=12.0) as client:
+                response = await client.get(
+                    f"{self.base_url}/models",
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                )
+                response.raise_for_status()
+        except Exception as exc:
+            error = f"Mini's language model readiness check failed: {type(exc).__name__}"
+            raise LLMUnavailable(error) from exc
+
     async def reply(
         self,
         *,

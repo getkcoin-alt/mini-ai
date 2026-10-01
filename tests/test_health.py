@@ -9,7 +9,19 @@ def test_liveness_and_readiness(app_client):
     assert live.headers["cache-control"] == "no-store"
     assert ready.status_code == 200
     assert ready.json()["status"] == "ready"
+    assert ready.json()["checks"]["llm"] == "ok"
     assert ready.json()["checks"]["vault"] == "ok"
+
+
+def test_readiness_reports_unavailable_required_llm(app_client):
+    client, _, llm = app_client
+    llm.available = False
+
+    ready = client.get("/health/ready")
+
+    assert ready.status_code == 503
+    assert ready.json()["status"] == "not_ready"
+    assert ready.json()["checks"]["llm"] == "unavailable"
 
 
 def test_admin_endpoints_fail_closed(app_client):

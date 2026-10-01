@@ -123,7 +123,7 @@ def create_app(
     async def ready() -> JSONResponse:
         checks: dict[str, Any] = {
             "storage": "ok",
-            "llm": "configured" if companion.configured else "not_configured",
+            "llm": "not_configured",
             "vault": "configured" if vault_client.configured else "not_configured",
         }
         problems: list[str] = []
@@ -132,7 +132,15 @@ def create_app(
         except Exception:
             checks["storage"] = "error"
             problems.append("storage")
-        if cfg.llm_required and not companion.configured:
+        if companion.configured:
+            try:
+                await companion.check()
+                checks["llm"] = "ok"
+            except LLMUnavailable:
+                checks["llm"] = "unavailable"
+                if cfg.llm_required:
+                    problems.append("llm")
+        elif cfg.llm_required:
             problems.append("llm")
         if cfg.vault_mcp_required:
             if not vault_client.configured:

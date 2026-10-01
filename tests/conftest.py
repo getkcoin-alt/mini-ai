@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from miniai.app import create_app
 from miniai.config import Settings
+from miniai.llm import LLMUnavailable
 
 
 class FakeVault:
@@ -40,6 +41,11 @@ class FakeLLM:
 
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
+        self.available = True
+
+    async def check(self) -> None:
+        if not self.available:
+            raise LLMUnavailable("test provider unavailable")
 
     async def reply(self, **kwargs: Any) -> str:
         self.calls.append(kwargs)

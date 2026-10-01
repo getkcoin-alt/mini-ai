@@ -74,7 +74,7 @@ The Vault API must allow its Railway private hostname in `MCP_ALLOWED_HOSTS`.
 ## Health contract
 
 - `GET /health/live` proves the process and event loop are serving. It never calls the model or Vault.
-- `GET /health/ready` checks local storage and, when required, performs `vault_memory_stats` through MCP.
+- `GET /health/ready` checks local storage and, when required, verifies the model provider's authenticated `/models` endpoint and performs `vault_memory_stats` through MCP.
 - `GET /v1/status` exposes only configuration booleans, never secret values.
 
 ## Proving cross-agent memory
