@@ -52,7 +52,7 @@ The PIN is returned once in the onboarding response. Open the returned URL and e
 
 ## Railway deployment
 
-The repository contains a Dockerfile and `railway.toml`. The service listens on Railway's `PORT` and uses `/health/live` as the platform health check. Mount a persistent volume at `/data` and set `MINI_DATA_DIR=/data`.
+The repository contains a Dockerfile plus the current Railway Infrastructure-as-Code partial in `.railway/railway.ts`. It connects this repository and branch to the `mini-ai` service, uses `/health/live` as the platform health check, and mounts a 1 GB persistent volume at `/data`. The service listens on Railway's injected `PORT`; set `MINI_DATA_DIR=/data`.
 
 Recommended private-network variables when Mini and Vault Zeta are in the same Railway project:
 
