@@ -10,7 +10,7 @@ _SCRYPT_P = 1
 
 
 def generate_pin() -> str:
-    return f"{secrets.randbelow(10_000):04d}"
+    return f"{secrets.randbelow(1_000_000):06d}"
 
 
 def validate_pin(pin: str) -> str:
@@ -45,4 +45,3 @@ def verify_pin(pin: str, encoded: str) -> bool:
         return hmac.compare_digest(actual, bytes.fromhex(expected))
     except (TypeError, ValueError):
         return False
-

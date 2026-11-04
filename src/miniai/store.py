@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import json
 import os
 import re
 import sqlite3
 import threading
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -49,13 +51,18 @@ class TenantStore:
         self._init_registry()
 
     @staticmethod
-    def _connect(path: Path) -> sqlite3.Connection:
+    @contextmanager
+    def _connect(path: Path):
         conn = sqlite3.connect(path, timeout=5, check_same_thread=False)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         conn.execute("PRAGMA journal_mode = WAL")
         conn.execute("PRAGMA busy_timeout = 5000")
-        return conn
+        try:
+            with conn:
+                yield conn
+        finally:
+            conn.close()
 
     def _init_registry(self) -> None:
         with self._lock, self._connect(self.registry_path) as conn:
@@ -93,6 +100,29 @@ class TenantStore:
                     id TEXT PRIMARY KEY,
                     role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
                     content TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS preferences (
+                    id INTEGER PRIMARY KEY CHECK(id = 1),
+                    data TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS memories (
+                    id TEXT PRIMARY KEY,
+                    content TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS goals (
+                    id TEXT PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    next_step TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'active',
+                    created_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS checkins (
+                    id TEXT PRIMARY KEY,
+                    goal_id TEXT NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
+                    note TEXT NOT NULL,
                     created_at TEXT NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS idx_messages_created
@@ -213,3 +243,176 @@ class TenantStore:
         with self._lock, self._connect(self.registry_path) as conn:
             conn.execute("SELECT 1").fetchone()
 
+    def preferences(self, slug: str) -> dict:
+        self._init_tenant_db(slug)
+        with self._lock, self._connect(self._tenant_path(slug)) as conn:
+            row = conn.execute("SELECT data FROM preferences WHERE id = 1").fetchone()
+        defaults = {
+            "onboarded": False,
+            "tone": "warm",
+            "focus": "",
+            "memory_enabled": False,
+            "mode": "friend",
+        }
+        if row:
+            defaults.update(json.loads(row["data"]))
+        return defaults
+
+    def save_preferences(self, slug: str, values: dict) -> dict:
+        with self._lock:
+            prefs = self.preferences(slug)
+            prefs.update(values)
+            with self._connect(self._tenant_path(slug)) as conn:
+                conn.execute(
+                    "INSERT OR REPLACE INTO preferences VALUES (1, ?)", (json.dumps(prefs),)
+                )
+            return prefs
+
+    def memories(self, slug: str) -> list[dict]:
+        self._init_tenant_db(slug)
+        with self._lock, self._connect(self._tenant_path(slug)) as conn:
+            return [
+                dict(r)
+                for r in conn.execute(
+                    "SELECT * FROM memories ORDER BY updated_at DESC, id DESC"
+                ).fetchall()
+            ]
+
+    def save_memory(self, slug: str, content: str, memory_id: str | None = None) -> dict:
+        text = content.strip()
+        if not text or len(text) > 2000:
+            raise ValueError("Memory must contain 1 to 2000 characters")
+        with self._lock:
+            self._init_tenant_db(slug)
+            with self._connect(self._tenant_path(slug)) as conn:
+                if memory_id:
+                    cur = conn.execute(
+                        "UPDATE memories SET content = ?, updated_at = ? WHERE id = ?",
+                        (text, _now(), memory_id),
+                    )
+                    if not cur.rowcount:
+                        raise KeyError(memory_id)
+                else:
+                    duplicate = conn.execute(
+                        "SELECT * FROM memories WHERE content = ?", (text,)
+                    ).fetchone()
+                    if duplicate:
+                        return dict(duplicate)
+                    count = conn.execute("SELECT count(*) FROM memories").fetchone()[0]
+                    if count >= 200:
+                        raise ValueError(
+                            "Your memory notebook is full. Remove an old memory first."
+                        )
+                    memory_id = str(uuid4())
+                    conn.execute(
+                        "INSERT INTO memories VALUES (?, ?, ?, ?)",
+                        (memory_id, text, _now(), _now()),
+                    )
+                return dict(
+                    conn.execute("SELECT * FROM memories WHERE id = ?", (memory_id,)).fetchone()
+                )
+
+    def delete_memory(self, slug: str, memory_id: str) -> bool:
+        with self._lock, self._connect(self._tenant_path(slug)) as conn:
+            return bool(conn.execute("DELETE FROM memories WHERE id = ?", (memory_id,)).rowcount)
+
+    def recall(self, slug: str, query: str) -> list[dict]:
+        # Bounded lexical recall; no external embedding service or shared Vault writes.
+        tokens = set(re.findall(r"\w{3,}", query.casefold()))
+        rows = self.memories(slug)
+        rows.sort(
+            key=lambda r: len(tokens & set(re.findall(r"\w{3,}", r["content"].casefold()))),
+            reverse=True,
+        )
+        return rows[:8]
+
+    def goals(self, slug: str) -> list[dict]:
+        self._init_tenant_db(slug)
+        with self._lock, self._connect(self._tenant_path(slug)) as conn:
+            rows = [
+                dict(r)
+                for r in conn.execute("SELECT * FROM goals ORDER BY created_at DESC").fetchall()
+            ]
+            for row in rows:
+                row["checkins"] = [
+                    dict(r)
+                    for r in conn.execute(
+                        "SELECT * FROM checkins WHERE goal_id = ? ORDER BY created_at DESC",
+                        (row["id"],),
+                    ).fetchall()
+                ]
+        return rows
+
+    def create_goal(self, slug: str, title: str, next_step: str) -> dict:
+        with self._lock:
+            self._init_tenant_db(slug)
+            with self._connect(self._tenant_path(slug)) as conn:
+                if conn.execute("SELECT 1 FROM goals WHERE status = 'active'").fetchone():
+                    raise ValueError("Complete your current goal before starting another.")
+                goal_id = str(uuid4())
+                conn.execute(
+                    "INSERT INTO goals VALUES (?, ?, ?, 'active', ?)",
+                    (goal_id, title.strip(), next_step.strip(), _now()),
+                )
+            return next(r for r in self.goals(slug) if r["id"] == goal_id)
+
+    def checkin(self, slug: str, goal_id: str, note: str, next_step: str, complete: bool) -> dict:
+        with self._lock, self._connect(self._tenant_path(slug)) as conn:
+            row = conn.execute(
+                "SELECT * FROM goals WHERE id = ? AND status = 'active'", (goal_id,)
+            ).fetchone()
+            if not row:
+                raise KeyError(goal_id)
+            conn.execute(
+                "INSERT INTO checkins VALUES (?, ?, ?, ?)",
+                (str(uuid4()), goal_id, note.strip(), _now()),
+            )
+            conn.execute(
+                "UPDATE goals SET next_step = ?, status = ? WHERE id = ?",
+                (next_step.strip(), "complete" if complete else "active", goal_id),
+            )
+        return next(r for r in self.goals(slug) if r["id"] == goal_id)
+
+    def rotate_pin(self, slug: str, pin: str) -> bool:
+        encoded = hash_pin(pin)
+        with self._lock, self._connect(self.registry_path) as conn:
+            return bool(
+                conn.execute(
+                    "UPDATE tenants SET pin_hash = ? WHERE slug = ? AND active = 1", (encoded, slug)
+                ).rowcount
+            )
+
+    def export(self, slug: str) -> dict:
+        with self._lock:
+            prefs, memories, goals = self.preferences(slug), self.memories(slug), self.goals(slug)
+            with self._connect(self._tenant_path(slug)) as conn:
+                messages = [
+                    dict(r)
+                    for r in conn.execute(
+                        "SELECT role, content, created_at FROM messages ORDER BY rowid"
+                    ).fetchall()
+                ]
+        return {
+            "exported_at": _now(),
+            "preferences": prefs,
+            "memories": memories,
+            "goals": goals,
+            "messages": messages,
+            "scope": "Mini data only; separately shared Vault Zeta records are not included.",
+        }
+
+    def erase(self, slug: str) -> bool:
+        with self._lock:
+            if self.get(slug) is None:
+                return False
+            # Keep a deactivated registry tombstone so an old personal link is never reassigned.
+            path = self._tenant_path(slug)
+            for suffix in ("", "-wal", "-shm"):
+                Path(str(path) + suffix).unlink(missing_ok=True)
+            with self._connect(self.registry_path) as conn:
+                conn.execute(
+                    "UPDATE tenants SET active = 0, owner_name = '', pin_hash = '', "
+                    "vault_enabled = 0 WHERE slug = ?",
+                    (slug,),
+                )
+            return True

@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     mini_admin_api_key: str = ""
     mini_data_dir: Path = Path("data")
     mini_public_url: str = ""
+    mini_chat_per_minute: int = Field(default=20, ge=1, le=120)
+    mini_chat_per_day: int = Field(default=200, ge=1, le=10000)
     railway_public_domain: str = ""
 
     llm_base_url: str = ""
