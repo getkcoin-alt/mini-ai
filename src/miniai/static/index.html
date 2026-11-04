@@ -24,13 +24,27 @@
         <form id="pin-form">
           <label for="pin">Mini PIN</label>
           <div class="row">
-            <input id="pin" name="pin" inputmode="numeric" autocomplete="one-time-code" minlength="4" maxlength="12" required />
+            <input id="pin" type="password" name="pin" inputmode="numeric" autocomplete="one-time-code" minlength="4" maxlength="12" required />
             <button type="submit">Unlock</button>
           </div>
+          <p>Lost your PIN? Ask the person who shared your Mini link to reset it.</p>
           <p id="pin-error" class="error" role="alert"></p>
         </form>
       </section>
 
+      <p id="notice" role="status" aria-live="polite"></p>
+      <details id="space" class="card welcome" hidden open>
+        <summary id="space-title">Make Mini yours</summary>
+        <p>Choose how Mini supports you. Chats are saved in your Mini space and sent to the configured AI provider to answer you. Personal memories are saved only when you ask.</p>
+        <form id="preferences-form" class="stack">
+          <label>What would you like help with?<textarea id="focus" maxlength="500" placeholder="For example, build confidence in English"></textarea></label>
+          <label>Preferred style<select id="tone"><option value="warm">Warm and encouraging</option><option value="direct">Direct and practical</option><option value="gentle">Gentle and patient</option></select></label>
+          <label>Start in<select id="preferred-mode"><option value="friend">Best Friend</option><option value="mentor">Mentor</option></select></label>
+          <label class="toggle"><input id="memory-enabled" type="checkbox" />Allow Mini to use my saved personal memories in future chats</label>
+          <p>Switching this off pauses recall; it does not delete your memories. Your focus and Mentor goals still guide replies. Manage or delete these below.</p>
+          <button type="submit">Save my preferences</button>
+        </form>
+      </details>
       <section id="chat" class="card chat" hidden>
         <div class="toolbar">
           <label>Mode
@@ -41,18 +55,47 @@
           </label>
           <label id="remember-wrap" class="toggle" hidden>
             <input id="remember" type="checkbox" />
-            Remember in Vault Zeta
+            Also share my next message with the operator’s Vault Zeta
           </label>
         </div>
         <div id="messages" class="messages" aria-live="polite"></div>
+        <div class="memory-choice">
+          <label class="toggle"><input id="remember-private" type="checkbox" disabled />Save my next message as a personal memory</label>
+          <p id="memory-status">Personal memory is off.</p>
+        </div>
         <form id="chat-form" class="composer">
           <label class="sr-only" for="message">Message Mini</label>
           <textarea id="message" rows="2" maxlength="8000" placeholder="Talk to Mini…" required></textarea>
           <button id="send" type="submit">Send</button>
         </form>
       </section>
+      <section id="tools" hidden class="stack">
+        <details class="card welcome" open>
+          <summary>My personal memories</summary>
+          <p>Only your saved notes are recalled. Mini uses up to eight notes per answer, favouring matching words. Edit or remove anything here.</p>
+          <form id="memory-form" class="stack"><label>Something Mini should remember<textarea id="memory-content" required maxlength="2000"></textarea></label><button id="add-memory" type="submit">Save memory</button></form>
+          <div id="memory-list" class="stack"></div>
+        </details>
+        <details class="card welcome" open>
+          <summary>My Mentor goal</summary>
+          <p>One goal at a time. Keep a small next step and check in when you return. Mini uses these notes in Mentor mode.</p>
+          <div id="goal-list" class="stack"></div>
+          <form id="goal-form" class="stack"><label>My goal<input id="goal-title" required maxlength="200" /></label><label>My next small step<input id="goal-step" required maxlength="500" /></label><button type="submit">Start goal</button></form>
+        </details>
+        <details class="card welcome">
+          <summary>Account and data</summary>
+          <p>Download your full Mini history, memories and progress, or change your PIN.</p>
+          <button id="export" type="button">Download my data</button>
+          <button id="lock" type="button">Lock Mini</button>
+          <form id="pin-change-form" class="stack"><label>New PIN (6–12 digits)<input id="new-pin" type="password" inputmode="numeric" pattern="[0-9]{6,12}" required /></label><button type="submit">Change PIN</button></form>
+          <hr />
+          <p>Erase your Mini chats, memories, preferences and goals, and disable this link. Separately shared Vault Zeta records and backups need removal by the operator.</p>
+          <form id="erase-form" class="stack"><label>Type DELETE MY MINI DATA to confirm<input id="erase-confirm" required autocomplete="off" /></label><button type="submit" class="danger">Erase my Mini data</button></form>
+        </details>
+      </section>
     </main>
     <script src="/static/app.js" defer></script>
   </body>
 </html>
+
 

@@ -90,3 +90,54 @@ Use a unique canary rather than asking a generic question.
 Both directions must return the exact canary. A successful connection alone is not proof that both agents use the same store.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/VAULT_ZETA.md](docs/VAULT_ZETA.md).
+
+
+## Personal companion pilot
+
+The browser now includes a first-visit preferences form, personal memory notebook,
+and one active Mentor goal with progress check-ins. Existing tenant databases are
+upgraded lazily using additive `CREATE TABLE IF NOT EXISTS`; existing chats and PINs
+are retained. Back up `/data` before rollout.
+
+Personal memory is **off by default**, separate from Vault Zeta. A person can opt in,
+save notes explicitly (or save their next message), edit and delete notes, and pause
+recall without deleting saved notes. Mini retrieves up to eight personal notes using
+word overlap and recent updates; this is bounded lexical recall, not semantic search
+or unlimited recall of the entire chat history. No automatic extraction is performed.
+The active goal and latest five check-ins are provided in Mentor mode. Focus and tone
+preferences guide both modes even when personal memory recall is paused.
+
+New authenticated routes under `/v1/mini/t/{slug}`:
+
+- `PUT /preferences`: tone, focus, preferred mode, personal-memory consent.
+- `GET/POST /memories`, `PUT/DELETE /memories/{id}`: private notebook (200 notes max).
+- `GET/POST /goals`, `POST /goals/{id}/checkins`: one active goal and progress.
+- `GET /export`: all Mini messages, preferences, memories and goals as JSON.
+- `PUT /pin`: replace the current PIN with 6–12 digits; the old PIN stops working.
+- `POST /erase`: requires `{"confirmation":"DELETE MY MINI DATA"}`. Removes the
+  tenant database, its WAL/SHM files, and name/PIN from the registry. Keeps the slug
+  as a disabled tombstone so an old personal link is never reassigned. Does not
+  remove operator backups, AI-provider logs, or separately shared Vault records.
+
+Admin-assisted recovery: `POST /v1/mini/admin/tenants/{slug}/reset-pin` with the
+admin bearer key returns a new six-digit PIN once. Verify the person's identity
+before resetting or sharing a new PIN. No email identity or self-service recovery
+is claimed. The earlier admin DELETE endpoint still **deactivates**, not erases.
+
+Pilot controls are per-process: 10 incorrect PIN attempts lock a personal link for
+five minutes; additional per-link/address request ceilings bound hashing work.
+Authenticated chat budgets default to 20/minute and 200/day per person, configurable
+through `MINI_CHAT_PER_MINUTE` / `MINI_CHAT_PER_DAY`. Requests for each active tenant
+are serialized so an erase cannot race an in-flight chat and recreate their data.
+Run one process/replica (as configured); counters reset on restart. Before scaling,
+replace in-memory locks/limits with shared coordination, and add platform-level
+abuse protection. HTTP forwarding headers are not trusted for limiter identity.
+
+Chat failures restore the user's draft. Shared Vault writes happen only after a
+successful model response; an unavailable explicit save is reported as an error.
+Personal notes never enter Vault automatically. Vault-enabled users see a separately
+labelled checkbox explaining that those writes go to the operator's shared Vault.
+
+Tests use fake model/Vault clients: they verify isolation, consent, recall, progress,
+exports, recovery, erasure, failed-generation handling and quotas. A real model and
+Vault smoke test is still required in the deployment environment before public use.
