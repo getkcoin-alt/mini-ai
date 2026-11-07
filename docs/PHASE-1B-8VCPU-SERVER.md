@@ -103,7 +103,47 @@ ssh -L 8765:127.0.0.1:8765 root@NEW_SERVER_IP
 
 To connect the Vercel web UI later, build a separate authenticated HTTPS gateway that exposes only the protected /v1 routes, not unprotected localhost preview endpoints.
 
-## 6 — MVP decision gate
+## 6 — First measured results on the 8-vCPU server (2026-11-07)
+
+The owner ran the six-thread benchmark successfully, with both licensed references:
+
+| Request | Generation wall-clock | Generated speech | Real-time factor |
+| --- | ---: | ---: | ---: |
+| Friend cold (including first-use model loading/download) | 105.74 s | 3.60 s | 29.37× |
+| Friend warm | 3.33 s | 1.40 s | 2.38× |
+| Mentor warm | 4.82 s | 3.08 s | 1.57× |
+
+PyTorch 2.6.0+cpu. Peak Python process RSS: **3678 MiB**. Reported MemAvailable: **4.1 GiB before loading** and **0.7 GiB while the model remained loaded**. The shell returning after the benchmark does not imply that only 0.7 GiB remains now; recheck `free -h`. The Hugging Face first-use download was approximately 2.69 GB. Subsequent warm results do not include model download or startup.
+
+**Decision:** custom voice synthesis works. It is still *slower than playback* (RTF > 1), and a full STT → LLM → TTS round-trip is not yet measured. The server is close to a memory limit with Chatterbox resident. Do **not** launch Ollama 1B + faster-whisper + Chatterbox simultaneously in production until memory under load is validated. Keep the original 2-vCPU VPS available for a small brain or gateway if splitting responsibilities proves necessary.
+
+### Next safe diagnostics — no second Chatterbox load required
+
+First, after the voice benchmark has exited:
+
+~~~bash
+cd /root/mini-ai
+git pull --ff-only origin main
+free -h
+ps -eo pid,comm,rss --sort=-rss | head -12
+ollama list
+ollama ps
+~~~
+
+This reveals whether other services consume RAM and which Ollama models are resident. If the 1B model is not installed, `ollama pull llama3.2:1b` downloads it but does not force an inference session.
+
+Then measure the LLM **in isolation**, with Chatterbox not running:
+
+~~~bash
+cd /root/mini-ai
+MINI_CPU_THREADS=4 .venv/bin/python -m services.voice_worker.benchmark_brain
+~~~
+
+This script checks that at least 2 GiB of memory is available, times one local Ollama 1B reply, then requests the model unload to avoid pinning scarce RAM. The 2-GiB threshold is a conservative *preflight heuristic*, not a guarantee that all memory failures are prevented.
+
+Do not run `benchmark_host --test-brain` while MemAvailable is low. The updated benchmark skips simultaneous Ollama if it sees <2 GiB available, but separate runs produce clearer measurements. If other important applications are hosted here, do not stop them to free memory without inspecting their role and confirming a maintenance plan.
+
+## 7 — MVP decision gate
 
 - Listen to both styles across several sentences; sample-based cloning may not replicate the original emotional expression.
 - Measure warm speech synthesis time, full recorded-turn latency, memory pressure and restart behavior.
