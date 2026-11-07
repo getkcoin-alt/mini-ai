@@ -439,11 +439,15 @@ import { createVoiceRequestGate, voiceResponseError } from './voice-request-gate
       }
     };
     if (!inferenceRequest) return work();
-    return voiceGate.run(async () => {
+    try {
+      return await voiceGate.run(async () => {
+        updateVoiceUi();
+        return work();
+      });
+    } finally {
+      // The gate has released by now; re-enable local controls.
       updateVoiceUi();
-      try { return await work(); }
-      finally { updateVoiceUi(); }
-    });
+    }
   }
 
   async function toBase64(blob) {
