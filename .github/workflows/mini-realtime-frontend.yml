@@ -1,0 +1,52 @@
+name: Mini Modular Realtime Frontend
+
+on:
+  push:
+    branches:
+      - feature/mini-modular-realtime-frontend
+  pull_request:
+    paths:
+      - 'mini-realtime-*.js'
+      - 'public/mini-*.worklet.js'
+      - 'api/voice/realtime-config.js'
+      - 'app.js'
+      - 'index.html'
+      - 'styles.css'
+      - 'tests/mini-realtime.test.mjs'
+      - '.github/workflows/mini-realtime-frontend.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+          cache: npm
+      - name: Install pinned dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Check realtime modules and browser worklets
+        run: |
+          node --check mini-realtime-protocol.js
+          node --check mini-realtime-client.js
+          node --check mini-realtime-ui.js
+          node --check public/mini-capture.worklet.js
+          node --check public/mini-playback.worklet.js
+          node --check api/voice/realtime-config.js
+          node --check app.js
+      - name: Run security and application tests
+        run: npm test
+      - name: Build Vercel frontend
+        run: npm run build
+      - name: Ensure worklets survive bundle generation
+        run: |
+          test -s dist/mini-capture.worklet.js
+          test -s dist/mini-playback.worklet.js
+          test -s dist/index.html
