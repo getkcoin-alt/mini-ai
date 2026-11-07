@@ -44,8 +44,8 @@ For the full sequential backlog and technical plan, see:
 
 **Our direction:** earn trust through one excellent real-time conversation before expanding into multimodal agents, cross-device continuity and physical Mini hardware.
 
-## ElevenLabs voice integration
+## Bring your own Mini voice (Chatterbox + Ollama + Whisper)
 
-The code now supports verified owner-only Google login, protected ElevenLabs voice listing and streaming TTS, and private ElevenLabs Agent conversations through the official SDK. **It is not linked to the user's ElevenLabs account yet** because Google OAuth and ElevenLabs credentials are not configured in Vercel. The existing browser demo remains available.
+The project includes a private, self-hosted speech worker and a reference-audio upload UI. We do **not** use ElevenLabs APIs, models or credits for Mini's speech. The owner must provide a clean, authorized voice recording; ElevenLabs does **not** export its voice-clone weights. See [local voice setup](docs/VOICE-INTEGRATION.md).
 
-See [voice setup and security](docs/VOICE-INTEGRATION.md).
+Run `npm run build` and then the Python worker on `127.0.0.1:8765` to test the real model, after installing Python requirements, ffmpeg and Ollama. **Vercel only hosts the frontend and secure gateway**, so the production site still shows voice offline until the separate worker is connected.
