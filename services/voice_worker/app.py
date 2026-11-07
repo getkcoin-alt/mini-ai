@@ -17,7 +17,7 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, WebSocket
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -130,7 +130,8 @@ def get_status():
     state = engine.status()
     return {**state, "workerReady": True, "voiceReady": bool(state["referenceReady"]),
             "localStandalone": True, "inferenceBusy": resource_limits.busy(),
-            "inferencePolicy": "single-turn-cpu"}
+            "inferencePolicy": "single-turn-cpu",
+            "streamingPreviewReady": os.environ.get("MINI_ENABLE_LIVE_WS", "0") == "1"}
 
 
 def receive_sample(data: AudioUpload):
@@ -269,6 +270,14 @@ def protected_chat(data: ChatRequest):
 @app.post("/v1/turn", dependencies=[Depends(worker_auth)])
 def protected_turn(data: VoiceTurnRequest):
     return handle_turn(data)
+
+
+# Experimental incremental voice transport for localhost SSH tunnel ONLY.
+# This is not exposed via /v1, reverse proxies, or Vercel. Disabled by default.
+@app.websocket("/api/voice/live")
+async def local_live_preview(socket: WebSocket):
+    from .live_socket import run_live_turn
+    await run_live_turn(socket)
 
 
 # Convenient one-process local prototype. Never bind this app to 0.0.0.0.
