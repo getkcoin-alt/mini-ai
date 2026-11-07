@@ -5,11 +5,13 @@ on:
     paths:
       - "services/voice_worker/**"
       - "scripts/nfc_vm_preflight.sh"
+      - "scripts/nfc_create_mini_vm.sh"
       - ".github/workflows/voice-worker-sanity.yml"
   pull_request:
     paths:
       - "services/voice_worker/**"
       - "scripts/nfc_vm_preflight.sh"
+      - "scripts/nfc_create_mini_vm.sh"
 permissions:
   contents: read
 jobs:
@@ -30,6 +32,8 @@ jobs:
         run: bash -n services/voice_worker/setup_cpu_ubuntu.sh services/voice_worker/start-local.sh services/voice_worker/linux_preflight.sh
       - name: Check read-only NFC KVM preparation script syntax
         run: bash -n scripts/nfc_vm_preflight.sh
+      - name: Check guarded NFC VM creator syntax
+        run: bash -n scripts/nfc_create_mini_vm.sh
       - name: Check benchmark imports in both direct and module modes
         run: |
           python - <<'PY'
