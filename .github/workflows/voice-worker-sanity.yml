@@ -9,6 +9,7 @@ on:
       - "scripts/mini_guest_setup.sh"
       - "scripts/build_guest_frontend.sh"
       - "scripts/smoke_local_voice.py"
+      - "scripts/benchmark_pocket_tts.py"
       - ".github/workflows/voice-worker-sanity.yml"
   pull_request:
     paths:
@@ -18,6 +19,7 @@ on:
       - "scripts/mini_guest_setup.sh"
       - "scripts/build_guest_frontend.sh"
       - "scripts/smoke_local_voice.py"
+      - "scripts/benchmark_pocket_tts.py"
 permissions:
   contents: read
 jobs:
@@ -46,6 +48,10 @@ jobs:
         run: bash -n scripts/build_guest_frontend.sh
       - name: Check private HTTP voice smoke test syntax
         run: python -m compileall -q scripts/smoke_local_voice.py
+      - name: Validate isolated Pocket TTS benchmark CLI and syntax without installing weights
+        run: |
+          python -m compileall -q scripts/benchmark_pocket_tts.py
+          python scripts/benchmark_pocket_tts.py --help >/dev/null
       - name: Check benchmark imports in both direct and module modes
         run: |
           python - <<'PY'
