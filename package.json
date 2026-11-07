@@ -12,7 +12,6 @@
     "test": "node --test"
   },
   "dependencies": {
-    "@elevenlabs/client": "1.35.0",
     "google-auth-library": "11.3.3"
   },
   "devDependencies": {
