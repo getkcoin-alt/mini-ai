@@ -100,7 +100,7 @@ Open http://127.0.0.1:8765 locally. The production Vercel app will still show wo
 
 ~~~bash
 cd /root/mini-ai
-.venv/bin/python services/voice_worker/benchmark_cpu.py
+.venv/bin/python -m services.voice_worker.benchmark_cpu
 ~~~
 
 The script generates a benchmark WAV in your private voice directory and prints cold/warm inference timing, output audio duration and peak memory. It does not upload voice audio. If the warm TTS latency is unacceptable, keep this VPS as the app/API server and run Chatterbox on a separate GPU system.
