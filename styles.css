@@ -48,3 +48,40 @@ body.app-open{background:#0a0d17}body.app-open .site-header{display:none}.app-sc
 .voice-action-row button{white-space:normal;font-size:.73rem;padding:11px 14px}
 .voice-info-label{font-size:.74rem;color:#b2a0df;background:#baa2eb13;border:1px solid #bba4ec25;padding:12px;border-radius:11px;line-height:1.55;margin-top:13px}
 @media(max-width:640px){.voice-action-row{display:grid;grid-template-columns:1fr 1fr}.voice-action-row button:first-child{grid-column:1/-1}.voice-config-panel input[type=file]{font-size:.69rem}}
+
+
+/* Mini Live — progressive, real modular voice architecture. */
+.mini-realtime-panel{margin:18px 0 20px;padding:20px 21px;border:1px solid rgba(174,238,226,.18);border-radius:18px;background:linear-gradient(145deg,rgba(105,107,177,.12),rgba(93,197,179,.045) 55%,rgba(229,170,227,.04));box-shadow:0 15px 40px rgba(0,0,0,.13)}
+.mini-realtime-topline{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:17px}
+.mini-realtime-kicker{font-weight:800;color:#90ded6;font-size:.62rem;letter-spacing:.14em}
+.mini-realtime-topline h3{font-size:1.16rem;letter-spacing:-.04em;line-height:1.3;margin:6px 0 0}
+.mini-realtime-topline h3 em{color:#bfafed}
+.mini-realtime-badge{font-size:.63rem;font-weight:800;line-height:1.4;padding:8px 10px;border:1px solid rgba(201,203,230,.19);border-radius:20px;background:rgba(16,22,36,.7);color:#c3c4db;text-align:center;white-space:nowrap}
+.mini-realtime-badge[data-state="live"]{color:#a6f5dc;border-color:rgba(144,240,200,.4);background:rgba(59,142,128,.14)}
+.mini-realtime-badge[data-state="busy"]{color:#ebd7a4;border-color:rgba(237,209,145,.26)}
+.mini-realtime-flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.mini-realtime-flow span{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:10px 5px;border:1px solid rgba(180,178,220,.13);border-radius:10px;background:rgba(6,10,23,.34);font-size:.64rem;font-weight:700;line-height:1.4;color:#bab9d0;text-align:center;transition:background .16s,border-color .16s,color .16s}
+.mini-realtime-flow span strong{display:grid;place-items:center;border:1px solid rgba(194,188,232,.2);border-radius:50%;width:24px;height:24px;font-size:.62rem;color:#aca3d0}
+.mini-realtime-flow span[data-active="true"]{background:rgba(104,218,194,.12);border-color:rgba(116,240,211,.6);color:#d8fff7}
+.mini-realtime-flow span[data-active="true"] strong{border-color:#79dbc8;color:#79dbc8}
+.mini-realtime-signal{position:relative;margin:15px 0 12px;height:4px;border-radius:4px;background:rgba(191,189,222,.18);overflow:hidden}
+.mini-realtime-signal span{display:block;width:0;height:100%;background:linear-gradient(90deg,#a9bbfe,#87e8d9);border-radius:inherit;transition:width .13s}
+.mini-realtime-actions{display:flex;gap:9px;align-items:stretch}
+.mini-realtime-actions .button{padding:12px 13px;font-size:.78rem;flex:1;min-width:0;white-space:normal;text-align:center}
+.mini-realtime-actions .button:disabled{opacity:.46}
+.mini-realtime-bottom{display:flex;align-items:start;justify-content:space-between;gap:12px;margin-top:12px}
+.mini-realtime-bottom p{font-size:.7rem;line-height:1.5;color:#c1bed9;margin:0;flex:1}
+.mini-realtime-bottom span{font-size:.66rem;line-height:1.5;color:#92dfd2;text-align:right;flex:1}
+.mini-realtime-privacy{font-size:.66rem;line-height:1.55;color:#9290ac;margin:12px 0 0}
+@media(max-width:620px){
+  .mini-realtime-panel{padding:15px 12px;margin:16px 0}
+  .mini-realtime-topline h3{font-size:1rem}
+  .mini-realtime-kicker{font-size:.56rem}
+  .mini-realtime-badge{font-size:.58rem;padding:6px 8px}
+  .mini-realtime-flow span{font-size:.59rem;padding:8px 2px}
+  .mini-realtime-flow span strong{width:21px;height:21px}
+  .mini-realtime-actions .button{padding:12px 7px;font-size:.7rem}
+  .mini-realtime-bottom{flex-direction:column;gap:4px}
+  .mini-realtime-bottom span{text-align:left}
+}
+@media(prefers-reduced-motion:reduce){.mini-realtime-signal span,.mini-realtime-flow span{transition:none}}

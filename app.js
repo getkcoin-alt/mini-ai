@@ -1,5 +1,6 @@
 import { createVoiceRequestGate, voiceResponseError } from './voice-request-gate.js';
 import { installMiniAccountUI } from './mini-identity-ui.js';
+import { createMiniRealtimeUI } from './mini-realtime-ui.js';
 
 /* Mini AI — frontend-only interactive prototype.
  * Important: browser speech APIs and scripted demo responses are NOT an AI backend,
@@ -376,6 +377,7 @@ import { installMiniAccountUI } from './mini-identity-ui.js';
     const value = String(message || '').trim().slice(0, 500);
     if (!value) return;
     if (canUseWorker()) { void sendTextTurn(value); return; }
+    if (state.supaUser) return toast('Real Mini conversation is not connected yet. No scripted AI reply was generated.');
     const reply = previewReply(value);
     state.lastReply = reply;
     state.hasTalked = true;
@@ -511,6 +513,7 @@ import { installMiniAccountUI } from './mini-identity-ui.js';
         return false;
       }
     }
+    if (state.supaUser) return false; // Do not simulate a verified user's AI voice.
     return browserSpeak(message);
   }
 
@@ -689,7 +692,8 @@ import { installMiniAccountUI } from './mini-identity-ui.js';
     if (!state.recorder && !state.sendingVoice) {
       text('#voice-helper', canUseWorker()
         ? 'Tap to record · Private Whisper → Ollama → your Chatterbox voice'
-        : 'Tap to talk · Browser speech preview until local AI is connected.');
+        : state.supaUser ? 'Secure realtime voice awaiting NFC gateway activation.'
+        : 'Tap to talk · Browser speech preview (not real AI).');
     }
   }
 
@@ -819,9 +823,13 @@ import { installMiniAccountUI } from './mini-identity-ui.js';
     refreshHome();
      toast(state.mode === 'mentor' ? 'Mentor mode · calm and practical' : 'Friend mode · warm and playful');
   }));
-  $('#talk-button').addEventListener('click', () => { if (state.recorder || canUseWorker()) void toggleVoiceRecording(); else listen('home'); });
+  $('#talk-button').addEventListener('click', () => {
+    if (state.supaUser && !canUseWorker()) return toast('Mini realtime voice is awaiting the private gateway. No demo speech is substituted.');
+    if (state.recorder || canUseWorker()) void toggleVoiceRecording(); else listen('home');
+  });
   $('#replay-reply').addEventListener('click', () => { if (state.lastAudioBase64 && canUseWorker()) void playLocalAudio(state.lastAudioBase64); else void speak(state.lastReply || 'Hey, I’m Mini. I’m right here. Tell me what’s on your mind.'); });
   $('#stop-speaking').addEventListener('click', () => {
+    miniLive.interrupt();
     if (state.recorder) {
       state.discardNextRecording = true;
       state.recorder.stop();
@@ -841,7 +849,7 @@ import { installMiniAccountUI } from './mini-identity-ui.js';
   $('#show-captions').addEventListener('change', (event) => { state.captions = event.target.checked; refreshHome(); });
   $('#voice-output').addEventListener('change', (event) => {
     state.voiceOutput = event.target.checked;
-    if (!state.voiceOutput) stopVoicePlayback();
+    if (!state.voiceOutput) {stopVoicePlayback(); miniLive.stop();}
   });
   $('#voice-signin').addEventListener('click', begin);
   $('#voice-logout').addEventListener('click', () => void logoutOwner());
@@ -853,6 +861,11 @@ import { installMiniAccountUI } from './mini-identity-ui.js';
   $('#memory-forget').addEventListener('click', () => void forgetPrivateProfile());
   $('#clear-local').addEventListener('click', resetData);
   $('#sidebar-reset').addEventListener('click', resetData);
+
+  // Real-time voice uses the existing profile's Friend/Mentor mode and the
+  // same verified Supabase identity, but NOT the owner-only preview cookie.
+  // The stream remains disabled until a separate protected NFC gateway is ready.
+  const miniLive = createMiniRealtimeUI({getMode:()=>state.mode, onNotice:toast});
 
   // Do not auto-hydrate private demo data before identifying the signed-in
   // account; demo answers can be loaded only by explicitly entering demo mode.
@@ -872,6 +885,7 @@ import { installMiniAccountUI } from './mini-identity-ui.js';
         refreshHome();
       }
       state.supaUser = user;
+      void miniLive.setUser(user);
       updateMemoryUi();
     },
     getProfile: () => ({ profile: state.profile, completed: state.completed }),
@@ -894,6 +908,8 @@ import { installMiniAccountUI } from './mini-identity-ui.js';
       refreshHome();
     },
     onSignOut: async () => {
+      miniLive.stop();
+      await miniLive.setUser(null);
       // Sign out the legacy owner-only cookie as well if present.
       try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }); } catch (_) {}
       try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
