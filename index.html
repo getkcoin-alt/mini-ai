@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#090b15">
+  <meta name="description" content="Mini AI — a voice-first companion that learns how to be your best friend and mentor. An interactive frontend concept.">
+  <title>Mini AI — A little more human.</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="ambient ambient-one" aria-hidden="true"></div>
+  <div class="ambient ambient-two" aria-hidden="true"></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <header class="site-header">
+    <a class="brand" href="#" id="brand-home" aria-label="Mini AI homepage">
+      <span class="brand-icon" aria-hidden="true"><span class="brand-eye"></span><span class="brand-eye"></span></span>
+      <span>mini<span class="brand-dot">.</span></span>
+    </a>
+    <nav class="site-nav" aria-label="Main navigation">
+      <a href="#experience" data-nav="experience">The experience</a>
+      <a href="#how-it-works" data-nav="how-it-works">How it grows</a>
+      <a href="https://github.com/getkcoin-alt/mini-ai" target="_blank" rel="noopener noreferrer">Our vision ↗</a>
+    </nav>
+    <div class="header-actions"><span class="prototype-tag"><span class="status-dot"></span> FRONTEND PREVIEW</span><button class="button button-ghost button-small" id="header-start" type="button">Get started <span aria-hidden="true">↗</span></button></div>
+  </header>
+
+  <main>
+    <section id="screen-welcome" class="screen active" aria-label="Mini AI introduction">
+      <div class="hero container">
+        <div class="hero-copy">
+          <div class="eyebrow"><span class="eyebrow-line"></span> A NEW KIND OF CONNECTION <span class="eyebrow-spark">✦</span></div>
+          <h1>Not just smarter.<br><span class="gradient-text">Closer to you.</span></h1>
+          <p class="hero-description">Meet the little AI with a big heart and a sharp mind. A best friend when you need to talk. A mentor when you need to move. One voice that learns <em>your</em> world.</p>
+          <div class="hero-actions">
+            <button id="hero-start" class="button button-primary" type="button">Meet your Mini <span class="button-arrow">↗</span></button>
+            <button id="hero-preview" class="button button-outline" type="button"><span class="play-symbol">▶</span> Explore the preview</button>
+          </div>
+          <div class="hero-footnote"><span class="tiny-star">✳</span> Built for real conversations, not endless commands. <span class="separator">•</span> Voice first, always yours.</div>
+          <div class="proof-row"><div class="proof-avatar proof-1">✦</div><div class="proof-avatar proof-2">◡</div><div class="proof-avatar proof-3">✳</div><span><strong>One Mini.</strong> A different connection for every human.</span></div>
+        </div>
+        <div class="hero-art" id="experience">
+          <div class="orbit orbit-outer"></div><div class="orbit orbit-inner"></div><span class="star s1">✦</span><span class="star s2">✳</span><span class="star s3">✧</span>
+          <div class="companion-orb orb-hero" aria-label="Graphic of Mini, a smiling luminous orb"><div class="orb-sheen"></div><div class="orb-face"><span class="orb-eyes"><i></i><i></i></span><span class="orb-smile"></span></div><div class="orb-core"></div></div>
+          <div class="floating-card float-chat"><span class="chat-spark">✦</span><div><strong>Hey, you made it.</strong><small>I've been looking forward to this.</small></div><span class="tiny-wave">〰</span></div>
+          <div class="floating-card float-memory"><span class="mini-icon">✺</span><div><strong>Our connection</strong><small>Grows with every conversation</small></div><span class="accent-up">↗</span></div>
+          <div class="sound-wave wave-left"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="sound-wave wave-right"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="orbit-label orbit-label-top">HERE TO LISTEN</div><div class="orbit-label orbit-label-bottom">READY TO GROW</div>
+        </div>
+      </div>
+      <div class="approach container" id="how-it-works">
+        <div class="section-heading"><div><div class="section-kicker">THE MAGIC IS IN THE GETTING TO KNOW YOU</div><h2>A companion that <em>becomes yours.</em></h2></div><p>No complicated setup. Just a conversation, a little at a time.</p></div>
+        <div class="approach-grid">
+          <article class="approach-card"><span class="card-number">01 / HELLO</span><span class="approach-graphic approach-graphic-one">◡<i>✦</i></span><h3>Start with a hello.</h3><p>Sign in, choose a name, and tell Mini a little about yourself. Speak naturally or type.</p></article>
+          <article class="approach-card"><span class="card-number">02 / YOUR WAY</span><span class="approach-graphic approach-graphic-two">♡<i>↗</i></span><h3>Friend, mentor, or both.</h3><p>Choose the energy you need. Mini adapts its tone to your goals and your day.</p></article>
+          <article class="approach-card"><span class="card-number">03 / DEEPER</span><span class="approach-graphic approach-graphic-three">◎<i>✳</i></span><h3>Grow your connection.</h3><p>See your profile sync grow as you share preferences. Real memory comes in a later phase.</p></article>
+        </div>
+      </div>
+      <div class="bottom-cta container"><div><span class="section-kicker">YOUR STORY. YOUR MINI.</span><h2>Good things start with <em>hello.</em></h2></div><button class="button button-primary" id="footer-start" type="button">Begin your story <span class="button-arrow">↗</span></button></div>
+      <footer class="site-footer container"><span>© 2026 Mini AI · Built with a human point of view.</span><span>Interactive design prototype · Authentication and AI services are not connected.</span></footer>
+    </section>
+
+    <section id="screen-auth" class="screen flow-screen" aria-label="Signup preview">
+      <div class="flow-container auth-layout">
+        <aside class="auth-story">
+          <button class="back-link" id="auth-back" type="button">← Back to Mini</button>
+          <span class="section-kicker">CHAPTER 01 · THE INTRODUCTION</span>
+          <h2>Every great friendship starts <em>somewhere.</em></h2>
+          <p>Let's make this one yours. Pick how you'd like to sign in. No forms that feel like homework.</p>
+          <div class="auth-art"><div class="companion-orb orb-medium" aria-hidden="true"><div class="orb-sheen"></div><div class="orb-face"><span class="orb-eyes"><i></i><i></i></span><span class="orb-smile"></span></div><div class="orb-core"></div></div><span>“Hi. I'm Mini.”</span></div>
+          <div class="auth-footnote">✦ Your Mini will always be an AI — one designed to feel easy to talk to.</div>
+        </aside>
+        <div class="auth-panel panel">
+          <div class="panel-spark">✦</div>
+          <span class="section-kicker">LET'S GET ACQUAINTED</span>
+          <h3>Come on in.</h3>
+          <p class="muted">Choose a sign-in method to preview the journey.</p>
+          <div class="auth-tabs" role="tablist" aria-label="Choose sign-in method">
+            <button data-auth-method="google" class="auth-tab active" type="button" role="tab" aria-selected="true">Google</button>
+            <button data-auth-method="email" class="auth-tab" type="button" role="tab" aria-selected="false">Email</button>
+            <button data-auth-method="whatsapp" class="auth-tab" type="button" role="tab" aria-selected="false">WhatsApp</button>
+          </div>
+          <div id="auth-google" class="auth-method">
+            <button class="google-signin" id="google-signin" type="button"><span class="google-g"><span>G</span></span> Continue with Google <span>↗</span></button>
+            <p class="helper-note">Google OAuth will be connected through a secure authentication service. Not active in this frontend preview.</p>
+          </div>
+          <form id="auth-email" class="auth-method hidden">
+            <label for="email-address">Your email address</label><input type="email" id="email-address" placeholder="you@example.com" autocomplete="email" required>
+            <div class="code-wrap hidden" id="email-code-wrap"><label for="email-code">Six-digit verification code</label><input id="email-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••"><small class="demo-code-hint">Preview code: <strong>123456</strong> (nothing was sent)</small></div>
+            <button class="button button-soft full-width" type="submit" id="email-action">Preview email verification ↗</button>
+          </form>
+          <form id="auth-whatsapp" class="auth-method hidden">
+            <label for="wa-phone">WhatsApp number</label><div class="phone-row"><span>🇮🇳 +91</span><input type="tel" id="wa-phone" placeholder="98765 43210" inputmode="tel" autocomplete="tel-national" required></div>
+            <div class="code-wrap hidden" id="wa-code-wrap"><label for="wa-code">Six-digit WhatsApp code</label><input id="wa-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••"><small class="demo-code-hint">Preview code: <strong>123456</strong> (nothing was sent)</small></div>
+            <button class="button button-soft full-width" type="submit" id="wa-action">Preview WhatsApp verification ↗</button>
+            <p class="helper-note">Production OTP will use Scriwo through a server-side integration. Never expose API keys in the browser.</p>
+          </form>
+          <div class="auth-divider"><span>OR PREVIEW WITHOUT SIGNING IN</span></div>
+          <button class="button button-primary full-width" id="continue-demo" type="button">Continue in demo mode <span class="button-arrow">↗</span></button>
+          <div class="privacy-mini"><span>♧</span><span>Preview answers stay in this browser's local storage. No account is created or verified.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-setup" class="screen flow-screen" aria-label="Personalize Mini">
+      <div class="flow-container setup-layout">
+        <div class="setup-main">
+          <div class="step-top"><button class="back-link" id="setup-back" type="button">← Previous step</button><span id="step-counter">01 / 06</span></div>
+          <div class="step-progress"><span id="step-progress-bar"></span></div>
+          <div class="setup-heading"><span class="section-kicker">GETTING TO KNOW YOU <span aria-hidden="true">✦</span></span><h2>Just talk to me <em>like a person.</em></h2><p>You don't need the perfect words. Say it your way, and we'll turn it into a simple profile note.</p></div>
+          <div class="question-panel panel">
+            <div class="question-who"><div class="question-avatar">✦</div><div><strong id="question-speaker">mini is curious</strong><small>AN EASY QUESTION, JUST FOR YOU</small></div><button class="sound-button" id="listen-question" type="button" aria-label="Hear the question read aloud">◖))</button></div>
+            <h3 id="question-text">What should I call you?</h3>
+            <p id="question-help" class="question-help">First names, nicknames, anything that feels like you.</p>
+            <div id="question-choices" class="choice-grid hidden"></div>
+            <div id="answer-wrap" class="answer-wrap"><label for="question-answer">Your answer</label><textarea id="question-answer" rows="3" placeholder="You can type it here..."></textarea><div class="answer-actions"><span id="answer-hint">No perfect answers here.</span><button id="speak-answer" class="mic-outline" type="button" aria-label="Speak your answer">🎙 <span>Speak instead</span></button></div></div>
+            <div class="summary-preview hidden" id="summary-preview"><span>✦ PROFILE NOTE PREVIEW</span><p id="summary-text"></p><small>Simple local formatting for now · AI rewriting comes later</small></div>
+          </div>
+          <div class="step-bottom"><button class="link-button" id="skip-question" type="button">I'll tell you later</button><button class="button button-primary" id="next-question" type="button">Save & continue <span class="button-arrow">↗</span></button></div>
+          <div class="voice-info" id="setup-voice-info" role="status" aria-live="polite">🎙 Microphone support depends on your browser. Typing always works.</div>
+        </div>
+        <aside class="profile-preview">
+          <div class="profile-top"><span class="section-kicker">YOUR MINI PROFILE</span><span class="live-tag"><span class="status-dot"></span> LIVE PREVIEW</span></div>
+          <div class="small-orb-wrap"><div class="companion-orb orb-small" aria-hidden="true"><div class="orb-sheen"></div><div class="orb-face"><span class="orb-eyes"><i></i><i></i></span><span class="orb-smile"></span></div><div class="orb-core"></div></div></div>
+          <h3 id="profile-mini">Mini</h3><p class="profile-role" id="profile-mode">Your personal companion</p>
+          <div class="profile-data"><div><span>THE HUMAN</span><strong id="profile-name">Getting acquainted...</strong></div><div><span>OUR DYNAMIC</span><strong id="profile-tone">Still discovering</strong></div><div><span>WHAT MATTERS</span><strong id="profile-goal">We'll find out together.</strong></div></div>
+          <div class="sync-box"><div class="sync-header"><span>PROFILE SYNC</span><strong id="setup-sync-text">0%</strong></div><div class="sync-track"><span id="setup-sync-bar"></span></div><p>The more you tell Mini, the more of your preferences are mapped. This isn't a measure of AI understanding yet.</p></div>
+          <div class="profile-quote">“We don't have to learn everything about each other in one day.” <span>✦ mini</span></div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="screen-home" class="screen app-screen" aria-label="Mini AI app prototype">
+      <div class="app-shell">
+        <aside class="app-sidebar">
+          <div class="sidebar-top"><div class="sidebar-mark"><span class="brand-icon"><span class="brand-eye"></span><span class="brand-eye"></span></span><strong>mini<span class="brand-dot">.</span></strong></div><span class="sidebar-subtitle">YOUR PERSONAL UNIVERSE</span></div>
+          <nav class="app-nav" aria-label="App sections">
+            <button data-app-page="today" class="app-nav-item active" type="button"><span>✺</span> My space</button>
+            <button data-app-page="profile" class="app-nav-item" type="button"><span>♡</span> Our dynamic</button>
+            <button data-app-page="memory" class="app-nav-item" type="button"><span>▤</span> Memories <span class="soon-tag">SOON</span></button>
+            <button data-app-page="devices" class="app-nav-item" type="button"><span>⌘</span> Devices <span class="soon-tag">SOON</span></button>
+            <button data-app-page="settings" class="app-nav-item" type="button"><span>⚙</span> Preferences</button>
+          </nav>
+          <div class="sidebar-bottom"><div class="connection-card"><span>✦ CONNECTION IN PROGRESS</span><strong id="sidebar-sync">0% synced</strong><div class="sync-track"><span id="sidebar-sync-bar"></span></div><small>Better profile, better future Mini.</small></div><button id="sidebar-reset" class="sidebar-identity" type="button"><span id="user-initial">Y</span><span><strong id="sidebar-name">Your space</strong><small>Demo profile · Reset ↗</small></span></button></div>
+        </aside>
+        <div class="app-content">
+          <div class="app-topbar"><span class="app-breadcrumb">YOUR SPACE <span>/</span> <strong id="current-page-label">MY SPACE</strong></span><div class="app-top-actions"><span class="preview-label">✦ CONCEPT PREVIEW</span><span class="initial-avatar" id="app-initial">Y</span></div></div>
+          <div id="app-page-today" class="app-page active">
+            <div class="today-heading"><div><span class="section-kicker">YOUR SPACE, YOUR PACE</span><h2 id="home-greeting">Hey, you. <em>I'm right here.</em></h2><p>Anything on your mind? Talk to me. No need for a script.</p></div><div class="mode-switch" role="group" aria-label="Mini's conversation personality"><button data-mode="friend" type="button">♡ Friend</button><button data-mode="mentor" type="button">✦ Mentor</button></div></div>
+            <div class="conversation-layout">
+              <div class="voice-card">
+                <div class="voice-card-header"><span><span class="status-dot"></span> MINI IS HERE</span><button class="small-text-button" id="toggle-captions" type="button" aria-pressed="true">◫ Captions on</button></div>
+                <div class="voice-stage"><div class="stage-ring stage-ring-one"></div><div class="stage-ring stage-ring-two"></div><div class="stage-specks">✦ <span>✧</span> ✳</div><div class="companion-orb orb-app" id="app-orb" aria-label="Mini companion visual"><div class="orb-sheen"></div><div class="orb-face"><span class="orb-eyes"><i></i><i></i></span><span class="orb-smile"></span></div><div class="orb-core"></div></div><div class="voice-stage-name" id="mini-display-name">mini</div><div class="voice-state" id="voice-state">Ready when you are.</div></div>
+                <div class="voice-controls"><button class="icon-control" id="replay-reply" type="button" title="Replay Mini's last response" aria-label="Replay last response">◖))</button><button class="talk-button" id="talk-button" type="button" aria-label="Start voice conversation"><span id="talk-icon">🎙</span></button><button class="icon-control" id="stop-speaking" type="button" title="Stop Mini speaking" aria-label="Stop speaking">▣</button></div><p class="voice-helper" id="voice-helper">Tap the microphone to talk · Browser speech preview</p>
+                <div id="transcript-panel" class="transcript-panel"><div><span>YOU</span><p id="user-transcript">Your words will appear here.</p></div><div><span>MINI</span><p id="mini-transcript">“Hey! I'm glad you're here. What's going on?”</p></div></div>
+                <button id="type-toggle" class="text-toggle" type="button">Prefer to type? <span>Open text input ↓</span></button>
+                <form id="type-form" class="type-form hidden"><input id="type-input" type="text" placeholder="Tell Mini what's on your mind..." aria-label="Message to Mini"><button type="submit" aria-label="Send message">↗</button></form>
+                <div class="demo-callout">✳ Prototype conversation scripts + browser speech. Not a connected AI model yet.</div>
+              </div>
+              <aside class="right-rail">
+                <div class="rail-card connection-rail"><div class="rail-heading"><span>✦ OUR CONNECTION</span><span>PROFILE SIGNALS</span></div><div class="big-progress"><strong id="home-sync">0%</strong><span>PROFILE SYNC</span></div><div class="sync-track"><span id="home-sync-bar"></span></div><p id="sync-message">Every little detail helps your profile take shape.</p><button id="finish-profile" class="rail-link" type="button">Continue getting to know me ↗</button></div>
+                <div class="rail-card unlock-rail"><div class="rail-heading"><span>WHAT GROWS NEXT</span><span>✧</span></div><div class="unlock-item"><span class="unlock-symbol">♡</span><div><strong>Your personality</strong><small>Shape Mini's voice and vibe</small></div><span class="unlock-status" id="unlock-vibe">○</span></div><div class="unlock-item"><span class="unlock-symbol">✦</span><div><strong>Friend + mentor</strong><small>Switch the kind of support</small></div><span class="unlock-status" id="unlock-mode">○</span></div><div class="unlock-item"><span class="unlock-symbol">◎</span><div><strong>Personal context</strong><small>Your goals & boundaries</small></div><span class="unlock-status" id="unlock-context">○</span></div><div class="unlock-item"><span class="unlock-symbol">⌘</span><div><strong>Real continuity</strong><small>Coming with the AI backend</small></div><span class="unlock-status muted-status">SOON</span></div></div>
+                <div class="tiny-rail-quote">“A little better at understanding you, every time.” <span>— mini</span></div>
+              </aside>
+            </div>
+          </div>
+          <div id="app-page-profile" class="app-page">
+            <div class="subpage-heading"><span class="section-kicker">YOUR CONNECTION</span><h2>Make Mini <em>your Mini.</em></h2><p>Edit what Mini should know about your communication style. Saved locally in this preview.</p></div>
+            <form id="profile-edit" class="settings-panel panel"><label for="edit-name">What Mini calls you</label><input id="edit-name" autocomplete="nickname" required><label for="edit-mini-name">What you call Mini</label><input id="edit-mini-name" required><label for="edit-mode">What you need most</label><select id="edit-mode"><option value="both">A best friend and a mentor</option><option value="friend">A best friend</option><option value="mentor">A mentor</option></select><label for="edit-tone">How Mini should sound</label><select id="edit-tone"><option value="gentle">Gentle and encouraging</option><option value="balanced">Warm, balanced and practical</option><option value="direct">Direct and candid</option></select><label for="edit-focus">What you're working through</label><textarea id="edit-focus" rows="3"></textarea><label for="edit-boundaries">Things Mini should respect</label><textarea id="edit-boundaries" rows="3"></textarea><button class="button button-primary" type="submit">Save my preferences ↗</button></form>
+          </div>
+          <div id="app-page-memory" class="app-page">
+            <div class="subpage-heading"><span class="section-kicker">MEMORY THAT MEANS SOMETHING</span><h2>Remember the <em>important things.</em></h2><p>Persistent, private long-term memory is planned. The current preview only stores the setup profile in this browser.</p></div><div class="feature-placeholder panel"><div class="placeholder-icon">◎</div><h3>Your story, with your permission.</h3><p>Real Mini will ask before remembering sensitive information, let you inspect what it knows, and support forgetting or exporting it.</p><span class="coming-pill">PLANNED · NOT CONNECTED</span></div>
+          </div>
+          <div id="app-page-devices" class="app-page">
+            <div class="subpage-heading"><span class="section-kicker">MINI GOES WITH YOU</span><h2>One companion. <em>Everywhere.</em></h2><p>Hardware is a future destination: earbuds, a wearable, or a pocket companion paired to your phone.</p></div><div class="device-grid"><div class="feature-placeholder panel"><div class="device-drawing">⌁</div><h3>Mini hardware dock</h3><p>Pair a trusted Bluetooth Low Energy accessory with the mobile app, then route audio with an explicitly supported transport.</p><span class="coming-pill">PAIRING COMING LATER</span></div><div class="device-steps panel"><strong>HARDWARE PATH</strong><div><span>01</span> Phone app + secure user identity</div><div><span>02</span> Companion device discovery and permission</div><div><span>03</span> Audio route, session ownership and handoff</div><div><span>04</span> Optional private on-device inference</div><small>No hardware access is requested by this preview.</small></div></div>
+          </div>
+          <div id="app-page-settings" class="app-page">
+            <div class="subpage-heading"><span class="section-kicker">YOU'RE IN CONTROL</span><h2>Your Mini. <em>Your rules.</em></h2><p>Local preview preferences now; real permissions and privacy management later.</p></div><div class="settings-panel panel"><div class="setting-row"><div><strong>Speak Mini's answers</strong><p>Use available browser speech synthesis for scripted demo responses.</p></div><label class="switch"><input type="checkbox" id="voice-output" checked><span></span></label></div><div class="setting-row"><div><strong>Show conversation captions</strong><p>Display transcript text underneath Mini.</p></div><label class="switch"><input type="checkbox" id="show-captions" checked><span></span></label></div><div class="setting-row"><div><strong>Clear local preview profile</strong><p>Remove the sample profile and start onboarding again.</p></div><button class="button button-outline" type="button" id="clear-local">Clear demo data</button></div><div class="privacy-banner">🔒 There is no real account or backend memory in this prototype. Do not enter private or sensitive details.</div></div>
+          </div>
+        </div>
+        <nav class="mobile-bottom-nav" aria-label="Mobile app navigation"><button data-app-page="today" class="active" type="button"><span>✺</span>Home</button><button data-app-page="profile" type="button"><span>♡</span>My Mini</button><button data-app-page="memory" type="button"><span>◎</span>Memory</button><button data-app-page="devices" type="button"><span>⌘</span>Devices</button><button data-app-page="settings" type="button"><span>⚙</span>More</button></nav>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
