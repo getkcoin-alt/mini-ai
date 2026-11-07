@@ -15,6 +15,7 @@ class MiniPlaybackProcessor extends AudioWorkletProcessor {
     this.started = false;
     this.played = 0;
     this.reported = 0;
+    this.receivedEnd = false;
     this.port.onmessage = (event) => {
       const data = event.data || {};
       if (data.type === 'flush') {
@@ -22,6 +23,10 @@ class MiniPlaybackProcessor extends AudioWorkletProcessor {
         this.fraction = 0;
         this.started = false;
         this.played = this.reported = 0;
+        this.receivedEnd = false;
+      } else if (data.type === 'end') {
+        this.receivedEnd = true;
+        if (this.count === 0) this.port.postMessage({type:'playback.drain', milliseconds: Math.floor(1000*this.played/this.sourceRate)});
       } else if (data.type === 'chunk') {
         const input = data.pcm instanceof Int16Array
           ? data.pcm : new Int16Array(data.pcm);
@@ -49,8 +54,19 @@ class MiniPlaybackProcessor extends AudioWorkletProcessor {
     const step = this.sourceRate / sampleRate;
     for (let i = 0; i < out.length; i++) {
       if (this.count < 2) {
+        if (this.count === 1) {
+          out[i] = this.frames[this.read] / 32768;
+          this.read = (this.read + 1) % this.capacity;
+          this.count = 0;
+          this.played++;
+        }
         this.started = false;
         this.fraction = 0;
+        if (this.receivedEnd) {
+          this.receivedEnd = false;
+          this.port.postMessage({type:'playback.drain',
+            milliseconds: Math.floor(1000 * this.played / this.sourceRate)});
+        }
         break;
       }
       const first = this.frames[this.read] / 32768;
