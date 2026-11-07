@@ -30,11 +30,13 @@ class AudioUpload(BaseModel):
     audio_base64: str = Field(min_length=1, max_length=MAX_BASE64_LENGTH)
     mime: str = Field(default="audio/wav", max_length=70)
     consent: bool = False
+    mode: str = Field(default="friend", pattern="^(friend|mentor)$")
 
 
 class SpeechRequest(BaseModel):
     text: str = Field(min_length=1, max_length=700)
     language: str = Field(default="en", pattern="^(en|hi)$")
+    mode: str = Field(default="friend", pattern="^(friend|mentor)$")
 
 
 class ChatRequest(SpeechRequest):
@@ -109,16 +111,18 @@ def receive_sample(data: AudioUpload):
     if data.consent is not True:
         raise HTTPException(status_code=400, detail="Confirm that you own the voice or have permission to reproduce it.")
     audio = read_audio(data.audio_base64)
-    duration = safely(lambda: engine.save_reference(audio))
-    return {"saved": True, "durationSeconds": duration, "referenceReady": True, "location": "private-worker-disk"}
+    duration = safely(lambda: engine.save_reference(audio, data.mode))
+    return {"saved": True, "mode": data.mode, "durationSeconds": duration, "referenceReady": True, "location": "private-worker-disk"}
 
 
-def remove_sample():
-    return {"removed": engine.delete_reference(), "referenceReady": False}
+def remove_sample(mode: str = "friend"):
+    if mode not in ("friend", "mentor"):
+        raise HTTPException(status_code=400, detail="Invalid voice style")
+    return {"removed": engine.delete_reference(mode), "mode": mode, "referenceReady": engine.status()["referenceReady"]}
 
 
 def handle_speak(data: SpeechRequest):
-    wave = safely(lambda: engine.synthesize(data.text, data.language))
+    wave = safely(lambda: engine.synthesize(data.text, data.language, data.mode))
     return wrap_audio(wave, language=data.language)
 
 
@@ -126,7 +130,7 @@ def handle_chat(data: ChatRequest):
     if not engine.status()["referenceReady"]:
         raise HTTPException(status_code=409, detail="Upload a voice reference clip first.")
     answer = safely(lambda: engine.reply_to(data.text, mode=data.mode, language=data.language))
-    wav = safely(lambda: engine.synthesize(answer, data.language))
+    wav = safely(lambda: engine.synthesize(answer, data.language, data.mode))
     return wrap_audio(wav, transcript=data.text, reply=answer, language=data.language)
 
 
@@ -139,7 +143,7 @@ def handle_turn(data: VoiceTurnRequest):
         raise HTTPException(status_code=422, detail="Could not hear clear words. Try speaking again.")
     lang = "hi" if detected == "hi" else "en"
     reply = safely(lambda: engine.reply_to(transcript, mode=data.mode, language=lang))
-    wav = safely(lambda: engine.synthesize(reply, lang))
+    wav = safely(lambda: engine.synthesize(reply, lang, data.mode))
     return wrap_audio(wav, transcript=transcript, reply=reply, language=lang)
 
 
@@ -155,8 +159,8 @@ def protected_reference(data: AudioUpload):
 
 
 @app.delete("/v1/reference", dependencies=[Depends(worker_auth)])
-def protected_delete():
-    return remove_sample()
+def protected_delete(mode: str = "friend"):
+    return remove_sample(mode)
 
 
 @app.post("/v1/speak", dependencies=[Depends(worker_auth)])
@@ -186,8 +190,8 @@ def preview_reference(data: AudioUpload):
 
 
 @app.delete("/api/voice/sample", dependencies=[Depends(local_auth)])
-def preview_delete():
-    return remove_sample()
+def preview_delete(mode: str = "friend"):
+    return remove_sample(mode)
 
 
 @app.post("/api/voice/speak", dependencies=[Depends(local_auth)])
