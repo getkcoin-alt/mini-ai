@@ -10,10 +10,10 @@ An animated, mobile-first design prototype for a voice-first AI companion that c
 
 No dependencies, build system, API key or database are needed. Serve the repo root with any static web server (HTTPS or localhost recommended for microphone permissions):
 
-\`\`\`sh
+```sh
 python3 -m http.server 4173
 # open http://localhost:4173
-\`\`\`
+```
 
 Or deploy the Git repository directly to Vercel as a static project.
 
@@ -27,8 +27,8 @@ Or deploy the Git repository directly to Vercel as a static project.
 
 ## Product ownership
 
-- \`getkcoin-alt/mini-ai\`: new Mini AI user experience, client and future hardware-facing mobile app.
-- \`getkcoin-alt/itsmay\`: existing broader system, companion backend and related apps; **not modified** by this prototype.
+- `getkcoin-alt/mini-ai`: new Mini AI user experience, client and future hardware-facing mobile app.
+- `getkcoin-alt/itsmay`: existing broader system, companion backend and related apps; **not modified** by this prototype.
 
 For the full sequential backlog and technical plan, see:
 
