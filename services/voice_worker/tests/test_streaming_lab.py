@@ -15,7 +15,7 @@ class ClauseBufferTests(unittest.TestCase):
         buf = ClauseBuffer(min_chars=24, max_chars=145)
         self.assertEqual(buf.add("Let's talk about your plan"), [])
         result = buf.add(" today. Then we can begin.")
-        self.assertEqual(result, ["Let's talk about your plan today.", "Then we can begin."] if False else ["Let's talk about your plan today."])
+        self.assertEqual(result, ["Let's talk about your plan today."])
         self.assertEqual(buf.finish(), "Then we can begin.")
 
     def test_phrase_split_across_tokens(self):
