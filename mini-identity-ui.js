@@ -15,9 +15,12 @@ export function installMiniAccountUI({ onVerified, onState, getProfile, onSignOu
   const $ = selector => document.querySelector(selector);
   const feedback = message => notify(String(message).slice(0, 180));
   const intercept = (node, event, fn) => node?.addEventListener(event, (e) => {
-    if (!enabled) return;
+    const isAuth = ['google-signin', 'auth-email', 'auth-whatsapp'].includes(node?.id);
+    if (!enabled && !isAuth) return; // Preserve existing private owner-pilot controls.
+    if (enabled && !user && !isAuth) return; // Owner worker remains independent.
     e.preventDefault();
     e.stopImmediatePropagation();
+    if (!enabled) return feedback('Real signup is not configured. Choose the separate demo option.');
     void Promise.resolve(fn(e)).catch(error => feedback(error.message || 'Unable to verify your account.'));
   }, { capture: true });
 
@@ -156,6 +159,8 @@ export function installMiniAccountUI({ onVerified, onState, getProfile, onSignOu
       return { enabled: false };
     }
     $('#google-auth-hint').textContent = 'Real Google sign-in with Mini AI Auth.';
+    $('#google-real-slot')?.classList.add('hidden');
+    $('#google-signin')?.classList.remove('hidden');
     $('#email-action').textContent = 'Send real email code ↗';
     $('#wa-action').textContent = whatsAppEnabled ? 'Send WhatsApp code ↗' : 'Scriwo WhatsApp verification coming soon';
     $('#wa-action').disabled = !whatsAppEnabled;
