@@ -10,6 +10,7 @@ on:
       - "scripts/build_guest_frontend.sh"
       - "scripts/smoke_local_voice.py"
       - "scripts/benchmark_pocket_tts.py"
+      - "scripts/benchmark_streaming_brain.py"
       - ".github/workflows/voice-worker-sanity.yml"
   pull_request:
     paths:
@@ -20,6 +21,7 @@ on:
       - "scripts/build_guest_frontend.sh"
       - "scripts/smoke_local_voice.py"
       - "scripts/benchmark_pocket_tts.py"
+      - "scripts/benchmark_streaming_brain.py"
 permissions:
   contents: read
 jobs:
@@ -52,6 +54,8 @@ jobs:
         run: |
           python -m compileall -q scripts/benchmark_pocket_tts.py
           python scripts/benchmark_pocket_tts.py --help >/dev/null
+      - name: Syntax-check streaming brain benchmark without Ollama or voice models
+        run: python -m compileall -q scripts/benchmark_streaming_brain.py
       - name: Check benchmark imports in both direct and module modes
         run: |
           python - <<'PY'
