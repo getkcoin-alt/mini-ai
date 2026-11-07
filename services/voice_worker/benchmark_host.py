@@ -98,18 +98,27 @@ def main() -> int:
         return 1
 
     if args.test_brain:
-        print("Timing Ollama response (1B model, local host)...", flush=True)
-        start = time.perf_counter()
-        try:
-            reply = engine.reply_to(
-                "I want to make progress on my project. What's my first step?",
-                mode="mentor",
+        available = available_memory_gib()
+        if available is not None and available < 2.0:
+            print(
+                f"SKIPPED Ollama: only {available:.2f} GiB available with Chatterbox loaded. "
+                "Run the isolated brain benchmark after this process exits: "
+                ".venv/bin/python -m services.voice_worker.benchmark_brain",
+                flush=True,
             )
-            print(f"Ollama response time: {time.perf_counter() - start:.2f}s | "
-                  f"reply: {reply[:160]}", flush=True)
-        except Exception as exc:
-            print(f"OLLAMA FAILED: {type(exc).__name__}: {exc}", file=sys.stderr)
-            return 1
+        else:
+            print("Timing Ollama response (1B model, local host)...", flush=True)
+            start = time.perf_counter()
+            try:
+                reply = engine.reply_to(
+                    "I want to make progress on my project. What's my first step?",
+                    mode="mentor",
+                )
+                print(f"Ollama response time: {time.perf_counter() - start:.2f}s | "
+                      f"reply: {reply[:160]}", flush=True)
+            except Exception as exc:
+                print(f"OLLAMA FAILED: {type(exc).__name__}: {exc}", file=sys.stderr)
+                return 1
 
     print(f"Peak process memory: {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024:.0f} MiB")
     print(f"Remaining available RAM: {available_memory_gib() or 0:.1f} GiB")
