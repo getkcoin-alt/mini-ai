@@ -21,7 +21,17 @@ _TTS_MODELS = {}
 _WHISPER = None
 
 ROOT = Path(os.environ.get("MINI_VOICE_DATA_DIR") or (Path.home() / ".mini-ai" / "voice")).expanduser()
-REFERENCE = ROOT / "reference.wav"
+REFERENCE = ROOT / "reference.wav"  # legacy single reference, still accepted
+REFERENCES = {"friend": ROOT / "reference_friend.wav", "mentor": ROOT / "reference_mentor.wav"}
+
+
+def reference_for(mode: str = "friend") -> Path | None:
+    """Pick style-matched voice reference, falling back to either authorized style."""
+    candidates = [REFERENCES.get(mode, REFERENCES["friend"]), REFERENCES["friend"], REFERENCES["mentor"], REFERENCE]
+    for path in candidates:
+        if path.is_file() and path.stat().st_size > 10000:
+            return path
+    return None
 
 PROMPTS = {
     "friend": (
@@ -53,7 +63,8 @@ def ensure_private_dir():
 
 def status():
     return {
-        "referenceReady": REFERENCE.is_file() and REFERENCE.stat().st_size > 10000,
+        "referenceReady": reference_for() is not None,
+        "referenceModes": {mode: path.is_file() and path.stat().st_size > 10000 for mode, path in REFERENCES.items()},
         "ttsEngine": "Chatterbox (zero-shot reference voice)",
         "sttEngine": "faster-whisper",
         "brain": os.environ.get("MINI_OLLAMA_MODEL", "llama3.2:3b"),
@@ -88,7 +99,9 @@ def ffmpeg_convert(audio: bytes, *, sample_rate: int, max_secs: int) -> bytes:
     return output.getvalue()
 
 
-def save_reference(audio: bytes):
+def save_reference(audio: bytes, mode: str = "friend"):
+    if mode not in REFERENCES:
+        raise ValueError("Voice style must be friend or mentor")
     """Replace the current sample only after explicit voice-owner consent."""
     wav = ffmpeg_convert(audio, sample_rate=24000, max_secs=20)
     with wave.open(io.BytesIO(wav), "rb") as sound:
@@ -101,16 +114,18 @@ def save_reference(audio: bytes):
         with os.fdopen(fd, "wb") as file:
             file.write(wav)
         os.chmod(tmp, 0o600)
-        os.replace(tmp, REFERENCE)
+        os.replace(tmp, REFERENCES[mode])
     finally:
         if os.path.exists(tmp):
             os.unlink(tmp)
     return round(seconds, 1)
 
 
-def delete_reference():
+def delete_reference(mode: str = "friend"):
+    if mode not in REFERENCES:
+        raise ValueError("Voice style must be friend or mentor")
     try:
-        REFERENCE.unlink()
+        REFERENCES[mode].unlink()
         return True
     except FileNotFoundError:
         return False
@@ -141,9 +156,10 @@ def _get_tts(language: str):
         return _TTS_MODELS[key]
 
 
-def synthesize(text: str, language: str = "en") -> bytes:
-    """Run entirely on the local worker; do not generate with browser or ElevenLabs."""
-    if not REFERENCE.is_file():
+def synthesize(text: str, language: str = "en", mode: str = "friend") -> bytes:
+    """Run entirely on the local worker; choose a reference by Mini personality."""
+    reference = reference_for(mode)
+    if reference is None:
         raise VoiceNotReady("Upload an authorized recording before generating cloned speech.")
     language = "hi" if language == "hi" else "en"
     if not isinstance(text, str) or not text.strip():
@@ -151,9 +167,9 @@ def synthesize(text: str, language: str = "en") -> bytes:
     with MODEL_LOCK:
         model = _get_tts(language)
         if language == "en":
-            wav = model.generate(text[:600], audio_prompt_path=str(REFERENCE))
+            wav = model.generate(text[:600], audio_prompt_path=str(reference))
         else:
-            wav = model.generate(text[:600], audio_prompt_path=str(REFERENCE), language_id=language)
+            wav = model.generate(text[:600], audio_prompt_path=str(reference), language_id=language)
         import soundfile as sf
         output = io.BytesIO()
         sf.write(output, wav.squeeze().detach().cpu().numpy(), model.sr, format="WAV", subtype="PCM_16")
