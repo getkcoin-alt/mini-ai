@@ -460,13 +460,13 @@
     catch (_) { toast('Tap replay to hear the generated Mini voice.'); }
   }
 
-  async function speak(message) {
+  async function speak(message, mode = state.mode) {
     if (!state.voiceOutput || !message) return false;
     if (canUseWorker()) {
       try {
         stopVoicePlayback();
         text('#voice-state', 'Generating your local Mini voice...');
-        const response = await voiceRequest('speak', { text: String(message).slice(0, 700), language: 'en' });
+        const response = await voiceRequest('speak', { text: String(message).slice(0, 700), language: 'en', mode });
         state.lastAudioBase64 = response.audio_base64 || '';
         await playLocalAudio(state.lastAudioBase64);
         return true;
@@ -571,8 +571,8 @@
       : !v.ownerSignedIn ? 'Sign in to access your private voice worker.'
       : !v.workerReady ? 'Owner signed in. Private voice worker is not reachable.'
       : 'Private voice worker is connected.');
-    text('#voice-sample-status', v.referenceReady ? '✓ A voice reference is installed on your private worker. You can replace or remove it.'
-      : 'No reference voice installed. Choose a clean recording that you have permission to use.');
+    const modes = v.referenceModes || {};
+    text('#voice-sample-status', 'Best Friend voice: ' + (modes.friend ? 'installed' : 'not installed') + ' · Mentor voice: ' + (modes.mentor ? 'installed' : 'not installed') + '. Upload a recording for each style.');
     text('#voice-engine-note', v.workerReady
       ? 'Audio generation runs through the private Chatterbox model, with faster-whisper and local Ollama for complete speech turns. No ElevenLabs API used.'
       : 'Run the Python worker on your computer, or link a securely hosted GPU worker. Mini does not download or export ElevenLabs voice weights.');
@@ -582,7 +582,7 @@
     $('#voice-rights').disabled = !(v.workerReady && ownerAccess);
     $('#voice-upload').disabled = !(v.workerReady && ownerAccess);
     $('#voice-test').disabled = !canUseWorker();
-    $('#voice-delete').disabled = !(v.workerReady && ownerAccess && v.referenceReady);
+    $('#voice-delete').disabled = !(v.workerReady && ownerAccess && Boolean((v.referenceModes || {})[$('#voice-style').value]));
     if (!state.recorder && !state.sendingVoice) {
       text('#voice-helper', canUseWorker()
         ? 'Tap to record · Private Whisper → Ollama → your Chatterbox voice'
@@ -600,6 +600,7 @@
         ownerSignedIn: Boolean(data.ownerSignedIn),
         workerReady: Boolean(data.workerReady),
         referenceReady: Boolean(data.referenceReady),
+        referenceModes: data.referenceModes && typeof data.referenceModes === 'object' ? data.referenceModes : {},
         localStandalone: Boolean(data.localStandalone),
         voiceReady: Boolean(data.voiceReady ?? (data.workerReady && data.referenceReady))
       };
@@ -661,7 +662,7 @@
     $('#voice-upload').disabled = true;
     text('#voice-sample-status', 'Preparing your private voice reference...');
     try {
-      const result = await voiceRequest('sample', { audio_base64: await toBase64(file), mime: file.type || 'application/octet-stream', consent: true });
+      const result = await voiceRequest('sample', { audio_base64: await toBase64(file), mime: file.type || 'application/octet-stream', consent: true, mode: $('#voice-style').value });
       toast('Reference saved on your private worker (' + result.durationSeconds + ' seconds).');
       $('#voice-rights').checked = false;
       $('#voice-reference-file').value = '';
@@ -675,10 +676,10 @@
   async function removeVoiceReference() {
     if (!confirm('Delete Mini’s private reference recording from the worker? This cannot be undone.')) return;
     try {
-      await voiceRequest('sample', undefined, 'DELETE');
+      await voiceRequest('sample?mode=' + encodeURIComponent($('#voice-style').value), undefined, 'DELETE');
       state.lastAudioBase64 = '';
       await refreshVoiceStatus();
-      toast('Reference recording removed from the private worker.');
+      toast('Reference recording for ' + $('#voice-style').value + ' removed from the private worker.');
     } catch (error) { toast('Delete failed: ' + error.message); }
   }
 
@@ -731,8 +732,9 @@
   });
   $('#voice-signin').addEventListener('click', begin);
   $('#voice-logout').addEventListener('click', () => void logoutOwner());
-  $('#voice-test').addEventListener('click', () => void speak('Hey, I am Mini. This is the voice you chose for me. How does it sound?'));
+  $('#voice-test').addEventListener('click', () => void speak('Hey, I am Mini. This is the voice you chose for me. How does it sound?', $('#voice-style').value));
   $('#voice-upload').addEventListener('click', () => void uploadVoiceReference());
+  $('#voice-style').addEventListener('change', () => updateVoiceUi());
   $('#voice-delete').addEventListener('click', () => void removeVoiceReference());
   $('#clear-local').addEventListener('click', resetData);
   $('#sidebar-reset').addEventListener('click', resetData);
