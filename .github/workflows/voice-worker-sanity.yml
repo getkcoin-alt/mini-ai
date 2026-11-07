@@ -4,10 +4,12 @@ on:
     branches: [main]
     paths:
       - "services/voice_worker/**"
+      - "scripts/nfc_vm_preflight.sh"
       - ".github/workflows/voice-worker-sanity.yml"
   pull_request:
     paths:
       - "services/voice_worker/**"
+      - "scripts/nfc_vm_preflight.sh"
 permissions:
   contents: read
 jobs:
@@ -26,6 +28,8 @@ jobs:
         run: python -m unittest discover -s services/voice_worker/tests -p 'test_*.py' -v
       - name: Check CPU and local startup shell scripts
         run: bash -n services/voice_worker/setup_cpu_ubuntu.sh services/voice_worker/start-local.sh services/voice_worker/linux_preflight.sh
+      - name: Check read-only NFC KVM preparation script syntax
+        run: bash -n scripts/nfc_vm_preflight.sh
       - name: Check benchmark imports in both direct and module modes
         run: |
           python - <<'PY'
