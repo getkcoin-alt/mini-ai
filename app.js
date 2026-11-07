@@ -377,6 +377,7 @@ import { createMiniRealtimeUI } from './mini-realtime-ui.js';
     const value = String(message || '').trim().slice(0, 500);
     if (!value) return;
     if (canUseWorker()) { void sendTextTurn(value); return; }
+    if (state.supaUser) return toast('Real Mini conversation is not connected yet. No scripted AI reply was generated.');
     const reply = previewReply(value);
     state.lastReply = reply;
     state.hasTalked = true;
@@ -512,6 +513,7 @@ import { createMiniRealtimeUI } from './mini-realtime-ui.js';
         return false;
       }
     }
+    if (state.supaUser) return false; // Do not simulate a verified user's AI voice.
     return browserSpeak(message);
   }
 
@@ -690,7 +692,8 @@ import { createMiniRealtimeUI } from './mini-realtime-ui.js';
     if (!state.recorder && !state.sendingVoice) {
       text('#voice-helper', canUseWorker()
         ? 'Tap to record · Private Whisper → Ollama → your Chatterbox voice'
-        : 'Tap to talk · Browser speech preview until local AI is connected.');
+        : state.supaUser ? 'Secure realtime voice awaiting NFC gateway activation.'
+        : 'Tap to talk · Browser speech preview (not real AI).');
     }
   }
 
@@ -820,7 +823,10 @@ import { createMiniRealtimeUI } from './mini-realtime-ui.js';
     refreshHome();
      toast(state.mode === 'mentor' ? 'Mentor mode · calm and practical' : 'Friend mode · warm and playful');
   }));
-  $('#talk-button').addEventListener('click', () => { if (state.recorder || canUseWorker()) void toggleVoiceRecording(); else listen('home'); });
+  $('#talk-button').addEventListener('click', () => {
+    if (state.supaUser && !canUseWorker()) return toast('Mini realtime voice is awaiting the private gateway. No demo speech is substituted.');
+    if (state.recorder || canUseWorker()) void toggleVoiceRecording(); else listen('home');
+  });
   $('#replay-reply').addEventListener('click', () => { if (state.lastAudioBase64 && canUseWorker()) void playLocalAudio(state.lastAudioBase64); else void speak(state.lastReply || 'Hey, I’m Mini. I’m right here. Tell me what’s on your mind.'); });
   $('#stop-speaking').addEventListener('click', () => {
     miniLive.interrupt();
