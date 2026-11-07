@@ -150,3 +150,34 @@ virsh might be absent even when QEMU is in use; do not install it just for this 
 Benchmark the isolated worker against scrizaone's **11–13-second short warm text-to-voice turns**. Test both Friend and Mentor, Ollama, Whisper, memory, VM latency and browser audio before changing production routing. No NVIDIA GPU was detected; 40 threads and 80 GiB available memory do not establish low-latency speech by themselves.
 
 Keep scrizaone as the already-proven inference machine and retain the existing Vercel frontend unchanged until the private nfc environment has passed an authenticated end-to-end test.
+
+## Confirmed libvirt and cgroup inventory (owner's 2026-11-07 terminal output)
+
+- `virsh` is available at `/usr/bin/virsh`.
+- `virsh list --all` lists `win11-thunder-rdp` **running** and `ayush` **shut off**. The shut-off guest is not an unused resource entitlement; never start, replace, delete or repurpose either guest.
+- `systemd-detect-virt` returns `none`: the shell runs on the physical host (or is not detected as virtualized), consistent with a libvirt host. This does **not** mean the running Windows guest is absent.
+- `/sys/fs/cgroup` is `cgroup2fs` (unified cgroups) and systemd is `255 (255.4-1ubuntu8.18)`, supporting cgroup-enforced CPU/memory limits.
+- The earlier process list showed **two QEMU processes** although the default virsh connection lists **one running domain**. Confirm whether the second belongs to another libvirt connection, process namespace, or virtualization manager **before** allocating more resources. Do not kill an unknown QEMU process.
+
+### Next read-only provisioning checks (run on nfc, no changes)
+
+~~~bash
+virsh uri
+virsh -c qemu:///system list --all
+virsh pool-list --all
+virsh net-list --all
+command -v virt-install || true
+command -v cloud-localds || true
+df -h /var/lib/libvirt/images /opt 2>/dev/null
+virsh dominfo win11-thunder-rdp | grep -E 'State:|CPU.s:|Max memory:|Used memory:'
+virsh dominfo ayush | grep -E 'State:|CPU.s:|Max memory:|Used memory:'
+ps -eo pid,ppid,comm,rss,%cpu | grep -E 'qemu-system' | head -10
+~~~
+
+These checks identify default libvirt URI, storage pools, NAT networks, VM resource commitments and whether the nonprivileged guest-install tooling exists. Avoid copying full VM XML, disk images, passwords, command-line credentials or private network configuration into public logs.
+
+### Action gate
+
+After confirming an available pool/network and guest tooling, create a **new, named private VM** for Mini AI, initially 8 vCPUs, 16 GiB RAM and 80 GiB disk, subject to overall host reservations and VM workload safety. A new guest is preferred to installing Python models directly into the long-running hypervisor host. Nothing has yet been provisioned, and all existing VMs must remain untouched.
+
+Inside the new guest (not on the nfc host), clone `getkcoin-alt/mini-ai`, install the CPU worker, securely move owner-authorized voice references, and benchmark. Keep `scrizaone` as production rollback until the new guest proves improvement. Do not expose localhost-only Mini AI preview endpoints to the public internet.
