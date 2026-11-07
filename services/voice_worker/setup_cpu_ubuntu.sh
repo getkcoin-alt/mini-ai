@@ -28,9 +28,16 @@ if ! command -v uv >/dev/null 2>&1; then
   pipx install uv
 fi
 uv python install 3.11
-uv venv --python 3.11 .venv
+if [[ ! -x .venv/bin/python ]]; then
+  uv venv --python 3.11 .venv
+else
+  .venv/bin/python -c 'import sys; assert sys.version_info[:2] == (3,11), "Existing .venv must use Python 3.11"'
+  echo "Reusing existing Python 3.11 environment."
+fi
 
-# CPU wheels prevent the default CUDA runtime packages from filling disk.
+# Keep EVERY dependency-resolution step on CPU PyTorch: Chatterbox's source
+# dependency resolver may otherwise download massive CUDA wheels.
+export UV_TORCH_BACKEND=cpu
 uv pip install --python .venv/bin/python --index-url https://download.pytorch.org/whl/cpu \
   "torch==2.6.0" "torchaudio==2.6.0"
 
