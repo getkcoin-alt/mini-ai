@@ -27,7 +27,8 @@ test('owner-only signed sessions reject modification, other owners and expiry', 
   assert.equal(verifySession(token, timestamp + 48 * 60 * 60 * 1000), null);
   const intruder = makeSession({ sub: 'other-sub', email: 'attacker@example.com', now: timestamp });
   assert.equal(verifySession(intruder, timestamp), null);
-  assert.equal(readSession({ headers: { cookie: 'a=b; __Host-mini_session=' + token } })?.sub, 'google-subject-id');
+  const currentToken = makeSession({ sub: 'google-subject-id', email: 'karnveer@scriza.in' });
+  assert.equal(readSession({ headers: { cookie: 'a=b; __Host-mini_session=' + currentToken } })?.sub, 'google-subject-id');
 });
 
 test('same-origin POST policy requires matching HTTPS origin in production', () => {
