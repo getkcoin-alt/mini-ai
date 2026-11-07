@@ -111,7 +111,9 @@ export function profileRowForUser(userId, profile, now = new Date().toISOString(
   return { user_id: userId, display_name: data.name || '',
     mini_name: data.miniName || 'Mini', companion_mode: data.relationship || 'both',
     tone: data.tone || 'balanced', focus: data.focus || '',
-    boundaries: data.boundaries || '', consented_at: now, updated_at: now };
+    boundaries: data.boundaries || '',
+    completed_keys: Object.keys(data).filter(key => data[key].length > 0),
+    consented_at: now, updated_at: now };
 }
 
 export async function readMiniProfile() {
@@ -119,7 +121,7 @@ export async function readMiniProfile() {
   const user = await currentMiniUser();
   if (!user) throw new Error('Sign in first.');
   const { data, error } = await client.from('mini_profiles').select(
-    'display_name,mini_name,companion_mode,tone,focus,boundaries,updated_at'
+    'display_name,mini_name,companion_mode,tone,focus,boundaries,completed_keys,updated_at'
   ).eq('user_id', user.id).maybeSingle();
   if (error) throw error;
   return data || null;
