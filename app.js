@@ -532,7 +532,7 @@ import { createVoiceRequestGate, voiceResponseError } from './voice-request-gate
       applyVoiceReply(answer);
     } catch (error) {
       if (error.name !== 'AbortError') toast('Local AI reply failed: ' + error.message);
-    } finally { state.sendingVoice = false; }
+    } finally { state.sendingVoice = false; updateVoiceUi(); }
   }
 
   async function toggleVoiceRecording() {
@@ -581,7 +581,7 @@ import { createVoiceRequestGate, voiceResponseError } from './voice-request-gate
         } catch (error) {
           if (error.name !== 'AbortError') toast('Speech turn failed: ' + error.message);
           text('#voice-state', 'Could not finish this voice turn.');
-        } finally { state.sendingVoice = false; }
+        } finally { state.sendingVoice = false; updateVoiceUi(); }
       };
       recorder.start();
       $('#talk-button').classList.add('listening');
