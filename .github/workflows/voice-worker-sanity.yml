@@ -34,6 +34,10 @@ jobs:
           runpy.run_module("services.voice_worker.benchmark_cpu", run_name="import_probe")
           print("Benchmark import-path smoke test: PASS")
           PY
+      - name: Check staged speech pipeline CLI without loading models
+        run: |
+          python -m services.voice_worker.benchmark_pipeline --help >/dev/null
+          python -m compileall -q services/voice_worker/benchmark_pipeline.py
       - name: Test private dual-style audio reference importer
         run: |
           python - <<'PY'
