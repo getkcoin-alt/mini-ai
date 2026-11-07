@@ -14,6 +14,7 @@ export default async function handler(req, res) {
     workerConfigured: configured,
     workerReady: false,
     referenceReady: false,
+    referenceModes: { friend: false, mentor: false },
     voiceReady: false,
     voiceProvider: 'self-hosted-chatterbox',
     localStandalone: false,
@@ -24,6 +25,7 @@ export default async function handler(req, res) {
       const status = await callWorker('status', { method: 'GET', timeoutMs: 2500 });
       result.workerReady = Boolean(status.workerReady);
       result.referenceReady = Boolean(status.referenceReady);
+      result.referenceModes = { friend: Boolean(status.referenceModes?.friend), mentor: Boolean(status.referenceModes?.mentor) };
       result.voiceReady = result.workerReady && result.referenceReady;
     } catch { /* do not disclose internal network details in public readiness checks */ }
   }
