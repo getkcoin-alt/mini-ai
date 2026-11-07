@@ -5,3 +5,16 @@ dist/
 !.env.example
 .vercel/
 .DS_Store
+
+# Voice assets stay PRIVATE; never put user recordings into Git.
+*.wav
+*.mp3
+*.m4a
+*.webm
+*.flac
+*.ogg
+*.zip
+__pycache__/
+*.py[cod]
+.venv/
+.env.local
