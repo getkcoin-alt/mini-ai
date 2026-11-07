@@ -891,7 +891,9 @@ import { installMiniAccountUI } from './mini-identity-ui.js';
       refreshProfilePreview();
       refreshHome();
     },
-    onSignOut: () => {
+    onSignOut: async () => {
+      // Sign out the legacy owner-only cookie as well if present.
+      try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }); } catch (_) {}
       try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
       state.profile = { ...defaults }; state.completed = {}; state.hasTalked = false;
       screen('welcome');
