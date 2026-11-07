@@ -873,6 +873,23 @@ import { installMiniAccountUI } from './mini-identity-ui.js';
       updateMemoryUi();
     },
     getProfile: () => ({ profile: state.profile, completed: state.completed }),
+    onProfileLoaded: (record) => {
+      const saved = {
+        name: record.display_name, miniName: record.mini_name,
+        relationship: record.companion_mode, tone: record.tone,
+        focus: record.focus, boundaries: record.boundaries
+      };
+      state.profile = { ...defaults };
+      state.completed = {};
+      for (const key of Object.keys(defaults)) {
+        if (typeof saved[key] === 'string' && saved[key].trim()) {
+          state.profile[key] = saved[key];
+          state.completed[key] = true;
+        }
+      }
+      refreshProfilePreview();
+      refreshHome();
+    },
     onSignOut: () => {
       try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
       state.profile = { ...defaults }; state.completed = {}; state.hasTalked = false;
