@@ -557,6 +557,65 @@
     } catch (error) { toast('Microphone permission required: ' + error.message); }
   }
 
+  const canSyncProfile = () => Boolean(state.voiceStatus.workerReady &&
+    (state.voiceStatus.ownerSignedIn || state.voiceStatus.localStandalone));
+
+  function updateMemoryUi() {
+    const allowed = canSyncProfile();
+    $('#memory-consent').disabled = !allowed;
+    $('#memory-save').disabled = !allowed;
+    $('#memory-forget').disabled = !allowed;
+    if (!allowed) text('#memory-status', 'Private Mini AI memory is offline. Your setup stays only in this browser.');
+  }
+
+  async function readMemoryStatus() {
+    if (!canSyncProfile()) return updateMemoryUi();
+    try {
+      const res = await fetch('/api/voice/profile', { credentials: 'same-origin', cache: 'no-store' });
+      if (!res.ok) throw new Error('Profile service unavailable');
+      const data = await res.json();
+      text('#memory-status', data.saved ? 'Profile saved on your private worker. Mini can use it in spoken replies.' : 'No server profile saved. You control when Mini remembers.');
+    } catch (_) {
+      text('#memory-status', 'Could not read private memory. Your browser preferences remain local.');
+    }
+  }
+
+  async function syncPrivateProfile() {
+    if (!canSyncProfile()) return toast('Connect your private Mini AI worker before saving memory.');
+    if (!$('#memory-consent').checked) return toast('Confirm your permission before saving profile facts.');
+    const profile = {};
+    questions.forEach(q => { if (state.completed[q.key] && String(state.profile[q.key] || '').trim()) profile[q.key] = String(state.profile[q.key]).slice(0, q.key === 'focus' || q.key === 'boundaries' ? 600 : 80); });
+    if (!Object.keys(profile).length) return toast('Answer at least one setup question first.');
+    $('#memory-save').disabled = true;
+    try {
+      const res = await fetch('/api/voice/profile', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile, consent: true })
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(result.error || result.detail || 'Profile save failed');
+      $('#memory-consent').checked = false;
+      await readMemoryStatus();
+      toast('Mini saved only the setup facts you selected.');
+    } catch (error) { toast('Memory sync failed: ' + error.message); }
+    finally { updateMemoryUi(); }
+  }
+
+  async function forgetPrivateProfile() {
+    if (!canSyncProfile()) return;
+    if (!confirm('Delete the profile saved on your private Mini server? Your local browser profile will remain.')) return;
+    $('#memory-forget').disabled = true;
+    try {
+      const res = await fetch('/api/voice/profile', { method: 'DELETE', credentials: 'same-origin' });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(result.error || result.detail || 'Delete failed');
+      await readMemoryStatus();
+      toast('Mini has deleted its private server profile.');
+    } catch (error) { toast('Could not delete server profile: ' + error.message); }
+    finally { updateMemoryUi(); }
+  }
+
   function updateVoiceUi() {
     const v = state.voiceStatus;
     const ownerAccess = Boolean(v.ownerSignedIn || v.localStandalone);
@@ -583,6 +642,7 @@
     $('#voice-upload').disabled = !(v.workerReady && ownerAccess);
     $('#voice-test').disabled = !canUseWorker();
     $('#voice-delete').disabled = !(v.workerReady && ownerAccess && Boolean((v.referenceModes || {})[$('#voice-style').value]));
+    updateMemoryUi();
     if (!state.recorder && !state.sendingVoice) {
       text('#voice-helper', canUseWorker()
         ? 'Tap to record · Private Whisper → Ollama → your Chatterbox voice'
@@ -605,6 +665,7 @@
         voiceReady: Boolean(data.voiceReady ?? (data.workerReady && data.referenceReady))
       };
       updateVoiceUi();
+      if (canSyncProfile()) void readMemoryStatus();
       if (state.voiceStatus.authReady && data.googleClientId) initGoogleButton(data.googleClientId);
     } catch (_) {
       state.voiceStatus = { authReady: false, ownerSignedIn: false, workerReady: false, referenceReady: false, localStandalone: false, voiceReady: false };
@@ -736,6 +797,8 @@
   $('#voice-upload').addEventListener('click', () => void uploadVoiceReference());
   $('#voice-style').addEventListener('change', () => updateVoiceUi());
   $('#voice-delete').addEventListener('click', () => void removeVoiceReference());
+  $('#memory-save').addEventListener('click', () => void syncPrivateProfile());
+  $('#memory-forget').addEventListener('click', () => void forgetPrivateProfile());
   $('#clear-local').addEventListener('click', resetData);
   $('#sidebar-reset').addEventListener('click', resetData);
 
