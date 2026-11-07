@@ -224,3 +224,35 @@ To additionally test Whisper, use `--audio /path/to/your_short_voice_input.wav` 
 
 This validates a **staged prototype**. It is not evidence of warm continuous speech streaming or safe public multi-user hosting. The Ollama adapter now sets `keep_alive=0` by default to avoid retaining its memory alongside Chatterbox. For the live service, assess separating inference across the two existing servers or another GPU before allowing concurrent user requests.
 
+
+## 9 — Two successful text → LLM → cloned voice tests (2026-11-07)
+
+The owner completed two text-input tests with the intentionally isolated Python stages:
+
+| Mode | Ollama 1B stage | Chatterbox (fresh subprocess) | Total stages | Audio length |
+| --- | ---: | ---: | ---: | ---: |
+| Best Friend | 7.97s | 35.59s | **43.56s** | 8.16s |
+| Mentor | 4.14s | 21.62s | **25.75s** | 5.40s |
+
+STT was **skipped** because the benchmark began with text. Ollama generated the reply and Chatterbox generated audio using the owner-authorized references. The reported RAM after each finished subprocess was approximately 8.7–9.7 GiB available. This is not a live-chat latency measure.
+
+**Root cause of the long TTS stage:** `benchmark_pipeline.py` deliberately creates a new process for the voice stage on *every* test to avoid concurrent resident model memory. Each process must load several GB of model weights. By contrast, the existing FastAPI worker's `engine._TTS_MODELS` already caches the Chatterbox model in its long-lived process. The earlier `benchmark_host.py` measured **3.33s** warm Friend TTS and **4.82s** warm Mentor TTS on different (shorter) test phrases, confirming warm generation is faster but not guaranteeing a specific end-to-end speed.
+
+### Next: test cached model with memory guard, not public serving
+
+On the new 8-vCPU Ubuntu server, from the repository root:
+
+~~~bash
+cd /root/mini-ai
+git pull --ff-only origin main
+free -h
+
+MINI_CPU_THREADS=6 OMP_NUM_THREADS=6 MKL_NUM_THREADS=6 \
+  .venv/bin/python -m services.voice_worker.benchmark_resident --mode friend --threads 6
+~~~
+
+This NEW benchmark holds one Chatterbox model in a single process across two turns, calls local Ollama with `keep_alive=0`, and reports TTS load time separately from two warm reply timings. It refuses to start with fewer than **7 GiB MemAvailable** and has additional checks before major stages. The checks are heuristics, not a guarantee against out-of-memory errors. **Do not run concurrently with a deployed Mini worker, a Chatterbox benchmark, or a production service doing heavy compute.** It does not launch a public API.
+
+The result includes two private files under `~/.mini-ai/voice/`: `mini_friend_resident_turn1.wav` and `mini_friend_resident_turn2.wav`. Both reuse the Friend reference clip. Repeat with `--mode mentor` if the Friend run succeeds and server memory is healthy. A genuine speech-input test still requires the existing `benchmark_pipeline --audio PATH` flow (Whisper); that test runs models in separate processes and therefore does **not** measure production voice latency.
+
+**Do not enable resident Chatterbox plus Ollama plus Whisper for external users until the resident test demonstrates safe memory usage and successful generated replies.** For any later service, enforce a single inference queue, response-size/time limits and explicit quotas, and consider CPU pinning or moving the LLM to the original VPS.
