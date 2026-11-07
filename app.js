@@ -1,3 +1,5 @@
+import { createVoiceRequestGate, voiceResponseError } from './voice-request-gate.js';
+
 /* Mini AI — frontend-only interactive prototype.
  * Important: browser speech APIs and scripted demo responses are NOT an AI backend,
  * and the Google/email/WhatsApp flows below DO NOT authenticate real users.
@@ -5,6 +7,7 @@
 (function () {
   'use strict';
 
+  const voiceGate = createVoiceRequestGate();
   const STORAGE_KEY = 'mini-ai-design-preview-v1';
   const DEMO_CODE = '123456';
   const questions = [
@@ -16,7 +19,7 @@
     { key: 'boundaries', question: 'Is there anything you want me to respect?', help: "I can listen, challenge, or give you space. You're in charge.", placeholder: '“Be honest with me, but don’t push when I say stop.”', kind: 'text' }
   ];
   const defaults = { name: '', miniName: 'Mini', relationship: 'both', tone: 'balanced', focus: '', boundaries: '' };
-  const state = { profile: { ...defaults }, completed: {}, hasTalked: false, step: 0, auth: 'google', page: 'today', mode: 'friend', isListening: false, recognizer: null, autoSpeak: true, voiceOutput: true, captions: true, lastReply: '', previewGuest: true, demoExploration: false, voiceStatus: { authReady: false, ownerSignedIn: false, workerReady: false, referenceReady: false, voiceReady: false, localStandalone: false }, voiceAbort: null, voiceAudio: null, voiceAudioUrl: null, lastAudioBase64: '', recorder: null, recordingStream: null, recordingTimer: null, sendingVoice: false };
+  const state = { profile: { ...defaults }, completed: {}, hasTalked: false, step: 0, auth: 'google', page: 'today', mode: 'friend', isListening: false, recognizer: null, autoSpeak: true, voiceOutput: true, captions: true, lastReply: '', previewGuest: true, demoExploration: false, voiceStatus: { authReady: false, ownerSignedIn: false, workerReady: false, referenceReady: false, voiceReady: false, localStandalone: false }, voiceAbort: null, voiceAudio: null, voiceAudioUrl: null, lastAudioBase64: '', recorder: null, recordingStream: null, recordingTimer: null, sendingVoice: false, suppressPendingVoice: false, discardNextRecording: false };
 
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => Array.from(document.querySelectorAll(selector));
@@ -242,7 +245,7 @@
     }
     updateSummary();
     refreshProfilePreview();
-    if (announce && state.autoSpeak) speak(q.question);
+    if (announce && state.autoSpeak && !voiceGate.isBusy() && !state.sendingVoice) void speak(q.question, state.mode, { automatic: true });
   }
   function updateSummary() {
     const q = questions[state.step];
@@ -407,8 +410,8 @@
     && (state.voiceStatus.localStandalone || state.voiceStatus.ownerSignedIn));
 
   function stopVoicePlayback() {
-    if (state.voiceAbort) { try { state.voiceAbort.abort(); } catch (_) {} }
-    state.voiceAbort = null;
+    // Cancel only playback. Aborting HTTP does NOT reliably stop server-side
+    // model inference and can cause the next request to hit HTTP 429.
     if (state.voiceAudio) { try { state.voiceAudio.pause(); state.voiceAudio.src = ''; } catch (_) {} }
     state.voiceAudio = null;
     if (state.voiceAudioUrl) { URL.revokeObjectURL(state.voiceAudioUrl); state.voiceAudioUrl = null; }
@@ -417,18 +420,30 @@
   }
 
   async function voiceRequest(path, payload, method = 'POST') {
-    const controller = new AbortController();
-    state.voiceAbort = controller;
-    const res = await fetch('/api/voice/' + path, {
-      method, credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
-      ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
-      signal: controller.signal
+    const inferenceRequest = /^(speak|chat|turn|sample)(\?|$)/.test(path);
+    const work = async () => {
+      const controller = new AbortController();
+      state.voiceAbort = controller;
+      try {
+        const res = await fetch('/api/voice/' + path, {
+          method, credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
+          signal: controller.signal
+        });
+        const result = await res.json().catch(() => ({}));
+        if (!res.ok) throw voiceResponseError(res.status, result);
+        return result;
+      } finally {
+        if (state.voiceAbort === controller) state.voiceAbort = null;
+      }
+    };
+    if (!inferenceRequest) return work();
+    return voiceGate.run(async () => {
+      updateVoiceUi();
+      try { return await work(); }
+      finally { updateVoiceUi(); }
     });
-    const result = await res.json().catch(() => ({}));
-    if (state.voiceAbort === controller) state.voiceAbort = null;
-    if (!res.ok) throw new Error(result.error || result.detail || 'Local voice worker is not available.');
-    return result;
   }
 
   async function toBase64(blob) {
@@ -460,14 +475,23 @@
     catch (_) { toast('Tap replay to hear the generated Mini voice.'); }
   }
 
-  async function speak(message, mode = state.mode) {
+  async function speak(message, mode = state.mode, { automatic = false } = {}) {
     if (!state.voiceOutput || !message) return false;
     if (canUseWorker()) {
+      if (voiceGate.isBusy() || state.sendingVoice) {
+        if (!automatic) toast('Mini is finishing another voice response. Please try again shortly.');
+        return false;
+      }
+      state.suppressPendingVoice = false;
       try {
         stopVoicePlayback();
         text('#voice-state', 'Generating your local Mini voice...');
         const response = await voiceRequest('speak', { text: String(message).slice(0, 700), language: 'en', mode });
         state.lastAudioBase64 = response.audio_base64 || '';
+        if (state.suppressPendingVoice) {
+          text('#voice-state', 'Voice muted. You can replay it when ready.');
+          return true;
+        }
         await playLocalAudio(state.lastAudioBase64);
         return true;
       } catch (error) {
@@ -485,13 +509,14 @@
     state.lastReply = result.reply || '';
     state.lastAudioBase64 = result.audio_base64 || '';
     state.hasTalked = true; save(); refreshHome();
-    if (state.voiceOutput && result.audio_base64) void playLocalAudio(result.audio_base64);
-    else text('#voice-state', 'Response ready.');
+    if (state.voiceOutput && result.audio_base64 && !state.suppressPendingVoice) void playLocalAudio(result.audio_base64);
+    else text('#voice-state', state.suppressPendingVoice ? 'Reply ready · audio muted.' : 'Response ready.');
   }
 
   async function sendTextTurn(message) {
     if (!canUseWorker()) return handleMessage(message);
-    if (state.sendingVoice) return toast('Mini is finishing a reply. Tap stop to cancel.');
+    if (state.sendingVoice || voiceGate.isBusy()) return toast('Mini is finishing a voice response. Try again when it is ready.');
+    state.suppressPendingVoice = false;
     state.sendingVoice = true;
     stopVoicePlayback();
     text('#voice-state', 'Thinking and generating a voice...');
@@ -512,7 +537,7 @@
       return;
     }
     if (!canUseWorker()) return listen('home');
-    if (state.sendingVoice) return toast('Mini is still generating your last reply.');
+    if (state.sendingVoice || voiceGate.isBusy()) return toast('Mini is still generating a response. Try again shortly.');
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) return toast('This browser cannot record voice. Try typing.');
     try {
       stopVoicePlayback();
@@ -531,9 +556,15 @@
         state.recorder = null;
         $('#talk-button').classList.remove('listening');
         text('#talk-icon', '🎙');
+        if (state.discardNextRecording) {
+          state.discardNextRecording = false;
+          text('#voice-state', 'Recording discarded.');
+          return;
+        }
         const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
         if (blob.size < 1000) { toast('No audio was recorded. Try again.'); return; }
         if (blob.size > 3_000_000) { toast('Recording too large. Try a shorter message.'); return; }
+        state.suppressPendingVoice = false;
         state.sendingVoice = true;
         text('#voice-state', 'Hearing, thinking, speaking...');
         try {
@@ -640,7 +671,7 @@
     $('#voice-reference-file').disabled = !(v.workerReady && ownerAccess);
     $('#voice-rights').disabled = !(v.workerReady && ownerAccess);
     $('#voice-upload').disabled = !(v.workerReady && ownerAccess);
-    $('#voice-test').disabled = !canUseWorker();
+    $('#voice-test').disabled = !canUseWorker() || voiceGate.isBusy() || state.sendingVoice;
     $('#voice-delete').disabled = !(v.workerReady && ownerAccess && Boolean((v.referenceModes || {})[$('#voice-style').value]));
     updateMemoryUi();
     if (!state.recorder && !state.sendingVoice) {
@@ -778,7 +809,16 @@
   }));
   $('#talk-button').addEventListener('click', () => { if (state.recorder || canUseWorker()) void toggleVoiceRecording(); else listen('home'); });
   $('#replay-reply').addEventListener('click', () => { if (state.lastAudioBase64 && canUseWorker()) void playLocalAudio(state.lastAudioBase64); else void speak(state.lastReply || 'Hey, I’m Mini. I’m right here. Tell me what’s on your mind.'); });
-  $('#stop-speaking').addEventListener('click', () => { if (state.recorder) state.recorder.stop(); if (state.recognizer) state.recognizer.abort(); stopVoicePlayback(); text('#voice-state', 'Ready when you are.'); });
+  $('#stop-speaking').addEventListener('click', () => {
+    if (state.recorder) {
+      state.discardNextRecording = true;
+      state.recorder.stop();
+    }
+    if (state.recognizer) state.recognizer.abort();
+    if (voiceGate.isBusy()) state.suppressPendingVoice = true;
+    stopVoicePlayback();
+    text('#voice-state', voiceGate.isBusy() ? 'Mini is still processing; its response will be muted.' : 'Ready when you are.');
+  });
   $('#type-toggle').addEventListener('click', () => {
     const form = $('#type-form'); form.classList.toggle('hidden');
     text('#type-toggle span', form.classList.contains('hidden') ? 'Open text input ↓' : 'Close text input ↑');
