@@ -44,6 +44,20 @@ The competitive advantage is **trustworthy continuity + personal relevance + dep
 5. Mobile width 320px+ has large microphone affordance, bottom navigation, readable typography and no horizontal scrolling.
 6. "Memories" and "Devices" honestly show coming-soon states. No hardware or cloud account is falsely shown as connected.
 
+## Voice implementation update — local voice clone vertical slice (2026-11-07)
+
+- [x] Remove direct ElevenLabs playback, voice-list and Agent SDK dependencies from Mini AI.
+- [x] Implement an optional private voice worker using reference-audio-conditioned Chatterbox (Turbo English / Nano CPU / Multilingual V3 Hindi), faster-whisper for input and Ollama for reply generation.
+- [x] Add reference-upload permission, remove reference, voice playback preview, typed replies and segment-based speech-turn UI.
+- [x] Add authenticated HTTPS Vercel gateway to the private model service; no voice model or audio samples committed to Git.
+- [x] Add Node gateway/auth tests and a successful Vercel frontend build.
+- [ ] Obtain the owner's authorized reference voice sample. **Cannot clone the existing ElevenLabs weights directly**.
+- [ ] Start and benchmark the model on the selected physical GPU/CPU. No live end-to-end voice cloning result has been verified.
+- [ ] Securely connect the GPU worker to the hosted mobile app and test end-to-end audio.
+- [ ] Continuous low-latency duplex streaming and natural interruptions (current prototype records one short voice turn at a time).
+
+See `docs/VOICE-INTEGRATION.md`. Voice cloning itself is **not** a finished live production feature until the sample, inference host and end-to-end tests are complete.
+
 ## Phase 1B — first **real** AI MVP (implement in this order)
 
 - [ ] **1. Secure identity gateway:** Google OIDC using auth-code/PKCE, email magic link or server-verified OTP, and WhatsApp OTP via Scriwo server-to-server flow with abuse/rate limits, expiry, resend rules, consent and verified phone binding.
