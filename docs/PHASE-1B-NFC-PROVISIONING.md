@@ -199,3 +199,18 @@ Benchmark Nano at 8 guest vCPUs first and compare with the previously measured w
 - Ubuntu 24.04 `virt-install` manpage: https://manpages.ubuntu.com/manpages/noble/man1/virt-install.1.html
 - Canonical released Ubuntu images: https://cloud-images.ubuntu.com/releases/noble/release/
 - libvirt `virsh` reference: https://www.libvirt.org/manpages/virsh.html
+
+## Verified read-only preflight — 2026-11-07
+
+- Libvirt URI: qemu:///system; the proposed guest name mini-ai-inference is unused.
+- Active storage pool: images; resolved directory /var/lib/libvirt/images.
+- Pool-reported available: 850.55 GiB; filesystem-reported available: 732 GB. Use the lower filesystem figure when planning.
+- NAT network default is active on bridge virbr0.
+- Available tools: virt-install, qemu-img, curl, sha256sum, python3.
+- cloud-localds is missing. Ubuntu's virt-install supports cloud-init directly, but its helper dependencies have not been tested on this particular host.
+- Host headroom: 40 logical CPUs, 84 GiB MemAvailable, 732 GB filesystem free; 17 GiB swap with ~171 MiB in use.
+- win11-thunder-rdp remains running, ayush remains shut down. Neither should be modified.
+
+**Go/no-go:** The read-only checks passed. The guest has NOT been created or booted. Before the write stage, copy an authorized operator SSH PUBLIC key to /root/mini-ai-operator.pub on nfc; do not copy any private key to the hypervisor or GitHub.
+
+The next phase downloads and checksum-verifies an official Ubuntu cloud image, creates a NEW qcow2 disk and starts a new 8-vCPU/16-GiB/80-GB guest. These are state-changing operations and are not performed by the preflight. The host's existing virtual machines and storage images remain unchanged.
