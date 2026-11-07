@@ -36,3 +36,15 @@ body.app-open{background:#0a0d17}body.app-open .site-header{display:none}.app-sc
 .voice-config-panel .button{margin:0}.voice-config-panel .button:disabled{opacity:.43}
 .voice-config-note{font-size:.7rem;color:#9690ad;line-height:1.7;margin:15px 0 0}
 @media(max-width:640px){.voice-provider-row{flex-wrap:wrap}.voice-provider-row>.button{max-width:100%}.voice-engine-indicator{font-size:.55rem}}
+
+
+/* Local reference voice controls */
+.voice-config-panel input[type=file]{width:100%;min-height:44px;border:1px dashed #bfa6ed65;border-radius:11px;color:#d9cee9;padding:12px;background:#171927;margin:8px 0 15px;font-size:.77rem}
+.voice-config-panel input[type=file]::file-selector-button{border:0;background:#baa7ee;color:#211737;padding:8px 12px;border-radius:7px;margin-right:11px;font-size:.74rem;cursor:pointer}
+.voice-config-panel input[type=file]:disabled{opacity:.48}
+.voice-config-panel .voice-consent-label{display:flex;align-items:flex-start;gap:11px;line-height:1.55;margin:8px 0 18px;font-size:.75rem;color:#c5bfd7;cursor:pointer}
+.voice-consent-label input{width:17px;height:17px;accent-color:#b7a1fa;margin:2px 0 0;flex:none}
+.voice-action-row{display:flex;align-items:center;flex-wrap:wrap;gap:9px;margin:7px 0}
+.voice-action-row button{white-space:normal;font-size:.73rem;padding:11px 14px}
+.voice-info-label{font-size:.74rem;color:#b2a0df;background:#baa2eb13;border:1px solid #bba4ec25;padding:12px;border-radius:11px;line-height:1.55;margin-top:13px}
+@media(max-width:640px){.voice-action-row{display:grid;grid-template-columns:1fr 1fr}.voice-action-row button:first-child{grid-column:1/-1}.voice-config-panel input[type=file]{font-size:.69rem}}
