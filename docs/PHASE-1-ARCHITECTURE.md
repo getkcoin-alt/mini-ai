@@ -176,3 +176,21 @@ Start with a mobile app owning the session. Pair a BLE accessory for secure devi
 - `itsmay/core/brain/prompts/system_mini_mentor.md`: candid mentor personality.
 - `itsmay/core/companion/profiles.py`: device local per-person profile and memory namespace.
 - `itsmay/docs/strategy.md`: narrow, measurable differentiation, memory and execution.
+
+## 8. Local voice prototype evolution (2026-11-07)
+
+The frontend-first Phase 1A demo now includes the code for a **private optional speech backend**. The previous browser SpeechRecognition / SpeechSynthesis preview remains the fallback, but real local-model speech paths are coded for voice-sample owners who run the worker. The actual GPU service is **not** running in the Vercel deployment.
+
+```text
+Mini mobile browser (record a 5–12-second utterance)
+  → owner-only Vercel gateway (or localhost loopback demo)
+  → private Python worker
+  → faster-whisper (speech recognition)
+  → Ollama llama3.2:3b (Friend or Mentor short reply)
+  → Chatterbox Turbo/Nano/Multilingual V3 + authorized sample
+  → waveform to browser speaker
+```
+
+Do not upload models, speaker audio or API secrets to GitHub. Only the private worker holds the reference recording. The signed Google user session is a **Mini AI security mechanism**, unrelated to ElevenLabs login. ElevenLabs accounts and API services are not needed by this stack. Details: [VOICE-INTEGRATION.md](VOICE-INTEGRATION.md).
+
+**Status distinction:** the mobile UI and server routes compile and deploy; Python model loading, actual cloning fidelity, mobile capture, end-to-end latency and safe production ingress still need verification on real hardware.
