@@ -857,7 +857,21 @@ import { installMiniAccountUI } from './mini-identity-ui.js';
    selectAuth('google');
   void installMiniAccountUI({
     onVerified: () => startSetup(),
-    onState: (user) => { state.supaUser = user; updateMemoryUi(); },
+    onState: (user) => {
+      // A different verified account must never inherit a previous demo user's
+      // local answers, including after a Google redirect or a shared computer.
+      if (user?.id && user.id !== state.supaUser?.id) {
+        try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
+        state.profile = { ...defaults };
+        state.completed = {};
+        state.hasTalked = false;
+        state.lastReply = '';
+        refreshProfilePreview();
+        refreshHome();
+      }
+      state.supaUser = user;
+      updateMemoryUi();
+    },
     getProfile: () => ({ profile: state.profile, completed: state.completed }),
     onSignOut: () => {
       try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
