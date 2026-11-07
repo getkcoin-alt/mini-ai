@@ -401,6 +401,230 @@
     toast('Local preview data cleared.');
   }
 
+
+  // Secure owner-only ElevenLabs integration. The browser never receives the API key.
+  function stopVoicePlayback() {
+    try { if (state.voiceAbort) state.voiceAbort.abort(); } catch (_) {}
+    state.voiceAbort = null;
+    if (state.voiceAudio) { try { state.voiceAudio.pause(); state.voiceAudio.src = ''; } catch (_) {} }
+    state.voiceAudio = null;
+    if (state.voiceAudioUrl) { URL.revokeObjectURL(state.voiceAudioUrl); state.voiceAudioUrl = null; }
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    $('#app-orb')?.classList.remove('speaking');
+  }
+  async function speak(message) {
+    if (!message || !state.voiceOutput || state.liveConversation) return false;
+    stopVoicePlayback();
+    if (state.voiceStatus.ownerSignedIn && state.voiceStatus.ttsReady) {
+      const ctrl = new AbortController();
+      state.voiceAbort = ctrl;
+      try {
+        text('#voice-state', 'Mini is finding the right words...');
+        const response = await fetch('/api/voice/speak', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: String(message).slice(0, 700), ...(state.chosenVoiceId ? { voiceId: state.chosenVoiceId } : {}) }),
+          signal: ctrl.signal
+        });
+        if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.error || 'Voice request failed'); }
+        const blob = await response.blob();
+        if (ctrl.signal.aborted) return false;
+        if (!blob.size) throw new Error('Empty audio response');
+        const url = URL.createObjectURL(blob);
+        state.voiceAudioUrl = url;
+        const audio = new Audio(url);
+        state.voiceAudio = audio;
+        audio.onplay = () => { $('#app-orb')?.classList.add('speaking'); text('#voice-state', 'Mini is speaking...'); };
+        audio.onended = () => { $('#app-orb')?.classList.remove('speaking'); text('#voice-state', 'Ready when you are.'); URL.revokeObjectURL(url); if (state.voiceAudioUrl === url) state.voiceAudioUrl = null; };
+        audio.onerror = () => { $('#app-orb')?.classList.remove('speaking'); toast('Could not play the ElevenLabs audio.'); };
+        await audio.play();
+        return true;
+      } catch (error) {
+        if (ctrl.signal.aborted) return false;
+        toast('ElevenLabs voice unavailable: ' + String(error.message).slice(0, 120) + '. Using browser voice preview.');
+      } finally {
+        if (state.voiceAbort === ctrl) state.voiceAbort = null;
+      }
+    }
+    return browserSpeak(message);
+  }
+  function updateVoiceUi() {
+    const v = state.voiceStatus;
+    const source = v.ownerSignedIn && v.agentReady ? 'ELEVENLABS · TWO-WAY LIVE VOICE'
+      : v.ownerSignedIn && v.ttsReady ? 'ELEVENLABS · REAL SPOKEN REPLIES (SCRIPTED BRAIN)'
+      : 'BROWSER VOICE DEMO · ELEVENLABS NOT CONNECTED';
+    text('#voice-engine-status', source);
+    text('#voice-account-status', !v.authReady ? 'Google OAuth has not been configured in Vercel yet.'
+      : !v.ownerSignedIn ? 'Sign in with your authorized Google account to activate ElevenLabs.'
+      : !v.ttsReady ? 'Google connected. Add the ElevenLabs API key and voice configuration in Vercel.'
+      : v.agentReady ? 'ElevenLabs voice and live conversation are configured.'
+      : 'ElevenLabs TTS is connected. Add a private Agent ID for real two-way voice.');
+    text('#voice-engine-note', v.ownerSignedIn && v.ttsReady
+      ? 'ElevenLabs Flash v2.5 voice from your account. Voice calls can consume ElevenLabs credits; only the authorized owner can request audio.'
+      : 'Original itsmay defaults to ElevenLabs Flash v2.5 and the Rachel voice ID. To use a voice from your ElevenLabs account, sign in and configure the server-side API key.');
+    show('#voice-signin', !v.ownerSignedIn);
+    show('#voice-logout', v.ownerSignedIn);
+    $('#voice-signin').disabled = !v.authReady;
+    $('#voice-test').disabled = !(v.ownerSignedIn && v.ttsReady);
+    if (!v.ownerSignedIn) {
+      const select = $('#eleven-voice-list'); select.disabled = true;
+      select.replaceChildren(new Option('Sign in to see your voices', ''));
+    }
+    if (!state.liveConversation && !state.liveConnecting) {
+      text('#voice-helper', v.ownerSignedIn && v.agentReady ? 'Tap mic to start a real two-way ElevenLabs conversation. Tap again to end.'
+        : 'Tap mic to talk · Browser recognition; ElevenLabs speaks if connected.');
+    }
+  }
+  async function refreshVoiceStatus() {
+    try {
+      const response = await fetch('/api/voice/status', { credentials: 'same-origin', cache: 'no-store' });
+      if (!response.ok) throw new Error('Status endpoint unavailable');
+      const data = await response.json();
+      state.voiceStatus = { authReady: Boolean(data.authReady), ownerSignedIn: Boolean(data.ownerSignedIn), ttsReady: Boolean(data.ttsReady), agentReady: Boolean(data.agentReady) };
+      updateVoiceUi();
+      if (state.voiceStatus.authReady && data.googleClientId) initGoogleButton(data.googleClientId);
+      if (state.voiceStatus.ownerSignedIn && state.voiceStatus.ttsReady) void loadAccountVoices();
+    } catch (_) {
+      state.voiceStatus = { authReady: false, ownerSignedIn: false, ttsReady: false, agentReady: false };
+      updateVoiceUi();
+    }
+  }
+  let googleButtonInitialized = false;
+  function initGoogleButton(clientId) {
+    if (googleButtonInitialized || !clientId) return;
+    googleButtonInitialized = true;
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true; script.defer = true;
+    script.onload = () => {
+      try {
+        if (!window.google?.accounts?.id) throw new Error('Google client unavailable');
+        window.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: async ({ credential }) => {
+            if (!credential) return;
+            try {
+              const response = await fetch('/api/auth/google', {
+                method: 'POST', credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ credential })
+              });
+              const result = await response.json();
+              if (!response.ok) throw new Error(result.error || 'Sign-in failed');
+              await refreshVoiceStatus();
+              toast('Signed in with verified Google identity. ElevenLabs setup status is shown in Preferences.');
+              if (Object.values(state.completed).some(Boolean)) enterHome();
+              else startSetup();
+            } catch (error) { toast('Google sign-in failed: ' + String(error.message).slice(0, 160)); }
+          }
+        });
+        const slot = $('#google-real-slot');
+        slot.replaceChildren();
+        window.google.accounts.id.renderButton(slot, { type: 'standard', theme: 'filled_black', size: 'large', text: 'continue_with', shape: 'pill', width: 320 });
+        show('#google-real-slot', true);
+        show('#google-signin', false);
+        text('#google-auth-hint', 'Secure Google sign-in verifies the configured account to unlock owner-only ElevenLabs features. Google sign-in does not grant access to your ElevenLabs account automatically.');
+      } catch (_) { toast('Google sign-in could not load. Check your browser and OAuth origins.'); }
+    };
+    script.onerror = () => toast('Google sign-in scripts are blocked in this browser.');
+    document.head.append(script);
+  }
+  async function loadAccountVoices() {
+    try {
+      const response = await fetch('/api/voice/voices', { credentials: 'same-origin', cache: 'no-store' });
+      if (!response.ok) throw new Error('Voice list unavailable');
+      const result = await response.json();
+      const select = $('#eleven-voice-list');
+      select.replaceChildren();
+      const voices = result.voices || [];
+      if (voices.length === 0) {
+        select.append(new Option('No voices returned by ElevenLabs', ''));
+        select.disabled = true;
+        return;
+      }
+      voices.forEach((voice) => { select.append(new Option(voice.name + (voice.category ? ' · ' + voice.category : ''), voice.voiceId)); });
+      const selected = state.chosenVoiceId && voices.some((voice) => voice.voiceId === state.chosenVoiceId)
+        ? state.chosenVoiceId : voices.some((voice) => voice.voiceId === result.defaultVoiceId) ? result.defaultVoiceId : voices[0].voiceId;
+      select.value = selected;
+      state.chosenVoiceId = selected;
+      select.disabled = false;
+      if (result.hasMore) toast('Showing the first 100 voices. Manage additional voices in your ElevenLabs dashboard.');
+    } catch (error) { toast('Could not read ElevenLabs account voices: ' + String(error.message).slice(0, 80)); }
+  }
+  async function logoutOwner() {
+    try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }); } catch (_) {}
+    if (state.liveConversation) {
+      try { await state.liveConversation.endSession(); } catch (_) {}
+      state.liveConversation = null;
+    }
+    stopVoicePlayback();
+    await refreshVoiceStatus();
+    toast('Signed out of the Mini AI owner session.');
+  }
+  async function toggleLiveConversation() {
+    if (state.liveConnecting) return;
+    if (state.liveConversation) {
+      const current = state.liveConversation;
+      state.liveConversation = null;
+      try { await current.endSession(); } catch (_) {}
+      $('#talk-button').classList.remove('listening');
+      text('#talk-icon', '🎙');
+      text('#voice-state', 'Live session ended.');
+      updateVoiceUi();
+      return;
+    }
+    if (!state.voiceStatus.ownerSignedIn || !state.voiceStatus.agentReady) return toast('A signed-in owner and configured ElevenLabs Agent are required.');
+    state.liveConnecting = true;
+    text('#voice-state', 'Connecting privately to ElevenLabs...');
+    text('#talk-icon', '…');
+    try {
+      stopVoicePlayback();
+      const result = await fetch('/api/voice/signed-url', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const body = await result.json();
+      if (!result.ok || !body.signedUrl) throw new Error(body.error || 'Could not get a signed voice session');
+      const { Conversation } = await import('@elevenlabs/client');
+      const session = await Conversation.startSession({
+        signedUrl: body.signedUrl,
+        connectionType: 'websocket',
+        onConnect: () => {
+          $('#talk-button').classList.add('listening');
+          text('#talk-icon', '■');
+          text('#voice-state', 'ElevenLabs live conversation · listening');
+        },
+        onDisconnect: () => {
+          state.liveConversation = null;
+          $('#talk-button').classList.remove('listening');
+          text('#talk-icon', '🎙');
+          text('#voice-state', 'Live session ended.');
+          updateVoiceUi();
+        },
+        onMessage: ({ source, message }) => {
+          const value = String(message || '').slice(0, 1000);
+          if (!value) return;
+          if (source === 'user') { text('#user-transcript', value); state.hasTalked = true; save(); refreshHome(); }
+          else if (source === 'ai' || source === 'agent') { text('#mini-transcript', '“' + value + '”'); state.lastReply = value; }
+        },
+        onModeChange: ({ mode }) => {
+          text('#voice-state', mode === 'speaking' ? 'Mini is speaking...' : 'Mini is listening...');
+          $('#app-orb')?.classList.toggle('speaking', mode === 'speaking');
+        },
+        onError: (error) => toast('ElevenLabs session error: ' + String(error?.message || error).slice(0, 120))
+      });
+      state.liveConversation = session;
+      state.hasTalked = true;
+      save(); refreshHome();
+      session.sendContextualUpdate('The user selected Mini mode: ' + state.mode + '. Their local UI profile may not be synchronized to this ElevenLabs agent yet. Ask permission before recording personal details.');
+      text('#voice-helper', 'Real two-way conversation is active. Tap the square to end the call.');
+    } catch (error) {
+      toast('Cannot connect live voice: ' + String(error.message).slice(0, 150));
+      text('#talk-icon', '🎙');
+      text('#voice-state', 'Live conversation unavailable.');
+      updateVoiceUi();
+    } finally {
+      state.liveConnecting = false;
+    }
+  }
+
   // Navigation
   ['#header-start', '#hero-start', '#footer-start'].forEach((sel) => $(sel).addEventListener('click', begin));
   $('#brand-home').addEventListener('click', (event) => { event.preventDefault(); screen('welcome'); });
