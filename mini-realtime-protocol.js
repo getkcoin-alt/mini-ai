@@ -48,3 +48,30 @@ export function miniPcm16FrameBytes(input) {
     throw new Error('Mini expects exactly 20ms of 16kHz mono PCM16');
   return input.buffer.slice(input.byteOffset, input.byteOffset + input.byteLength);
 }
+
+
+// Gateway-to-browser frames carry a one-byte type (2=output PCM), four-byte
+// LE stream id, then raw PCM16. Old packets cannot replay after barge-in.
+export function miniParseAudioPacket(binary) {
+  if (!(binary instanceof ArrayBuffer) || binary.byteLength < 7 ||
+      binary.byteLength > MINI_MAX_OUTPUT_FRAME_BYTES + 5)
+    throw new Error('Invalid Mini output audio frame');
+  const header = new DataView(binary);
+  if (header.getUint8(0) !== 2 || (binary.byteLength - 5) % 2 !== 0)
+    throw new Error('Invalid Mini output PCM packet');
+  const streamId = header.getUint32(1, true);
+  return { streamId, pcm: new Int16Array(binary.slice(5)) };
+}
+
+export function miniBuildAudioPacket(streamId, pcm) {
+  if (!Number.isInteger(streamId) || streamId < 1 || streamId > 0xffffffff ||
+      !(pcm instanceof Int16Array) || pcm.byteLength > MINI_MAX_OUTPUT_FRAME_BYTES ||
+      pcm.byteLength < 2)
+    throw new Error('Invalid Mini output audio');
+  const binary = new ArrayBuffer(5 + pcm.byteLength);
+  const view = new DataView(binary);
+  view.setUint8(0, 2);
+  view.setUint32(1, streamId, true);
+  new Uint8Array(binary, 5).set(new Uint8Array(pcm.buffer, pcm.byteOffset, pcm.byteLength));
+  return binary;
+}
