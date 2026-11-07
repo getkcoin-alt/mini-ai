@@ -93,7 +93,7 @@ export function installMiniAccountUI({ onVerified, onState, getProfile, onProfil
   intercept($('#voice-logout'), 'click', async () => {
     await signOutMini();
     user = null; onState(null);
-    onSignOut();
+    await onSignOut();
     feedback('Signed out from your Mini AI account.');
   });
 
