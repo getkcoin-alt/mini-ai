@@ -34,6 +34,12 @@ import { installMiniAccountUI } from './mini-identity-ui.js';
     toast.timer = setTimeout(() => el.classList.remove('show'), 3900);
   }
   function save() {
+    if (state.supaUser) {
+      // Signed-in profiles belong in RLS-protected Supabase, not shared-device
+      // localStorage where the next signed-out browser user could read them.
+      try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
+      return;
+    }
     if (state.demoExploration) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ profile: state.profile, completed: state.completed, hasTalked: state.hasTalked }));
@@ -798,7 +804,7 @@ import { installMiniAccountUI } from './mini-identity-ui.js';
   $('#google-signin').addEventListener('click', () => toast('Google login requires the OAuth client configured in Vercel. Continue in demo mode until then.'));
   $('#auth-email').addEventListener('submit', emailFlow);
   $('#auth-whatsapp').addEventListener('submit', whatsappFlow);
-  $('#continue-demo').addEventListener('click', startSetup);
+  $('#continue-demo').addEventListener('click', () => { load(); startSetup(); });
   $('#setup-back').addEventListener('click', () => { if (state.step === 0) screen('auth'); else { state.step--; renderQuestion(false); } });
   $('#skip-question').addEventListener('click', () => saveStep(true));
   $('#next-question').addEventListener('click', () => saveStep(false));
@@ -848,12 +854,8 @@ import { installMiniAccountUI } from './mini-identity-ui.js';
   $('#clear-local').addEventListener('click', resetData);
   $('#sidebar-reset').addEventListener('click', resetData);
 
-  const hadProfile = load();
-  if (hadProfile) {
-    // Do not auto-assume a persisted browser profile means an authenticated identity.
-    $('#header-start').textContent = 'Resume preview ↗';
-    $('#header-start').addEventListener('click', () => toast('This is a local demo profile, not a signed-in account.'));
-  }
+  // Do not auto-hydrate private demo data before identifying the signed-in
+  // account; demo answers can be loaded only by explicitly entering demo mode.
    selectAuth('google');
   void installMiniAccountUI({
     onVerified: () => startSetup(),
