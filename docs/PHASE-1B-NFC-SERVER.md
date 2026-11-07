@@ -121,3 +121,32 @@ Keep NFC's worker bound to 127.0.0.1 during tests. Do not directly expose FastAP
 - Pending: NFC benchmark at 8/12/16 threads and actual real-time factor.
 - Pending: authenticated Mini mobile browser to private-worker connection.
 - Pending: continuous duplex interruption support.
+
+## Verified nfc preflight — 2026-11-07
+
+The owner verified **40 logical CPUs / 20 physical cores, one NUMA node, 125 GiB RAM with 80 GiB available, 732 GB free SSD, no NVIDIA GPU detected**, and load averages of 0.86/3.62/4.71. Swap totals 17 GiB, with 1.8 GiB used; that is not by itself proof of current pressure.
+
+**Critical finding:** nfc is currently running two substantial qemu-system-x86 processes, approximately **31.0 GiB and 7.4 GiB RSS**, plus gunicorn, Python and Tor processes. It is likely an active QEMU/KVM virtualization host, not a spare server dedicated to Mini. Do not change the existing virtual machines, hypervisor services, network or firewall. Avoid installing Mini AI dependencies directly on the host until its VM responsibilities are understood.
+
+### Safe read-only virtualization inventory
+
+~~~bash
+command -v virsh && virsh list --all || true
+systemd-detect-virt
+stat -fc %T /sys/fs/cgroup
+systemctl --version | head -1
+lscpu | grep -E 'Model name|Flags|Hypervisor' | cut -c 1-220
+ps -eo pid,comm,%cpu,%mem,rss --sort=-rss | head -12
+~~~
+
+virsh might be absent even when QEMU is in use; do not install it just for this check.
+
+### Deployment recommendation
+
+**Preferred:** a new private test VM managed through the existing virtualization environment, initially **6–8 vCPUs, 12–16 GiB memory and 60–100 GB private disk**, contingent on remaining host headroom. This is a proposed allocation, not a VM that has been created. Confirm available management tools and resource reservations before provisioning.
+
+**Alternative:** isolate a nonprivileged worker in its own service cgroup/container with CPU and RAM limits, after verifying what tools are already installed. Ubuntu 24.04 systemd resource controls allow CPUQuota=600% (approximately the maximum CPU time of six logical CPUs), MemoryHigh=10G and MemoryMax=12G, though these limits cannot guarantee VM latency is unaffected. See https://manpages.ubuntu.com/manpages/noble/man5/systemd.resource-control.5.html .
+
+Benchmark the isolated worker against scrizaone's **11–13-second short warm text-to-voice turns**. Test both Friend and Mentor, Ollama, Whisper, memory, VM latency and browser audio before changing production routing. No NVIDIA GPU was detected; 40 threads and 80 GiB available memory do not establish low-latency speech by themselves.
+
+Keep scrizaone as the already-proven inference machine and retain the existing Vercel frontend unchanged until the private nfc environment has passed an authenticated end-to-end test.
