@@ -1,0 +1,52 @@
+name: Mini Auth & Memory Verification
+
+on:
+  push:
+    branches:
+      - feature/phase1b-supabase-multiuser
+    paths:
+      - 'app.js'
+      - 'mini-supabase.js'
+      - 'mini-identity-ui.js'
+      - 'api/auth/public-config.js'
+      - 'package.json'
+      - 'tests/supabase-identity.test.mjs'
+      - '.github/workflows/mini-auth-verify.yml'
+  pull_request:
+    paths:
+      - 'app.js'
+      - 'mini-supabase.js'
+      - 'mini-identity-ui.js'
+      - 'api/auth/public-config.js'
+      - 'package.json'
+      - 'tests/supabase-identity.test.mjs'
+      - '.github/workflows/mini-auth-verify.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - name: Install exact dependencies and generate lock file in CI workspace
+        run: npm install --no-audit --no-fund
+      - name: Verify package lock describes pinned Supabase SDK
+        run: node -e "const p=require('./package-lock.json');if(p.packages['node_modules/@supabase/supabase-js'].version!=='2.119.0')process.exit(1)"
+      - name: Preserve exact dependency lock for reproducible review
+        uses: actions/upload-artifact@v4
+        with:
+          name: mini-auth-package-lock
+          path: package-lock.json
+          retention-days: 2
+      - name: Syntax and security tests
+        run: npm test
+      - name: Production bundle build
+        run: npm run build
+      - name: Check compiled application
+        run: test -s dist/index.html && test -s dist/assets/*.js
