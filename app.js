@@ -565,6 +565,7 @@
       : v.workerReady ? 'VOICE WORKER READY · ADD A REFERENCE RECORDING'
       : 'BROWSER DEMO · LOCAL MODEL NOT CONNECTED';
     text('#voice-engine-status', status);
+    text('#conversation-source-note', canUseWorker() ? '✳ Local Mini AI voice active: Whisper + Ollama + Chatterbox. This is turn-based, not continuous streaming.' : '✳ Browser demo uses scripted replies. Connect your local AI worker and voice reference for real speech turns.');
     text('#voice-account-status', v.localStandalone ? 'Private local worker is running on this computer.'
       : !v.authReady ? 'To use this from Vercel, deploy a private voice worker and configure Google owner authentication.'
       : !v.ownerSignedIn ? 'Sign in to access your private voice worker.'
