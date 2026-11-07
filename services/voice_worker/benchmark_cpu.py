@@ -5,6 +5,12 @@ import resource
 import sys
 import time
 import wave
+from pathlib import Path
+
+# Allow direct invocation (`python services/voice_worker/benchmark_cpu.py`)
+# as well as the recommended module form (`python -m services.voice_worker.benchmark_cpu`).
+if __package__ in (None, ''):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 os.environ.setdefault("MINI_OLLAMA_MODEL", "llama3.2:1b")
 os.environ.setdefault("MINI_WHISPER_MODEL", "tiny.en")
