@@ -143,6 +143,38 @@ This script checks that at least 2 GiB of memory is available, times one local O
 
 Do not run `benchmark_host --test-brain` while MemAvailable is low. The updated benchmark skips simultaneous Ollama if it sees <2 GiB available, but separate runs produce clearer measurements. If other important applications are hosted here, do not stop them to free memory without inspecting their role and confirming a maintenance plan.
 
+## Troubleshooting — Ollama command not found (2026-11-07)
+
+New server diagnostic: `ollama: command not found` and the isolated model benchmark receives `Connection refused` on localhost:11434. This is an **uninstalled Ollama service**, not a Chatterbox failure. The TTS benchmark succeeded independently.
+
+Do **not** run `snap install ollama` just because Ubuntu suggests it; use the project's officially documented Linux installation to maintain a predictable systemd service. Review the downloaded script before execution:
+
+~~~bash
+cd /root/mini-ai
+curl -fsSL https://ollama.com/install.sh -o /tmp/mini-ollama-install.sh
+less /tmp/mini-ollama-install.sh
+sh /tmp/mini-ollama-install.sh
+command -v ollama
+systemctl enable --now ollama
+systemctl is-active ollama
+curl -fsS http://127.0.0.1:11434/api/tags
+~~~
+
+If `systemctl` or `curl` fails, check `systemctl status ollama --no-pager` and `journalctl -u ollama -n 70 --no-pager`. Keep the Ollama API bound to **127.0.0.1**, not a public network interface. On a shared VPS, review existing resource usage and don't stop unrelated services to free RAM.
+
+After the local Ollama API works:
+
+~~~bash
+ollama pull llama3.2:1b
+ollama list
+cd /root/mini-ai
+MINI_CPU_THREADS=4 .venv/bin/python -m services.voice_worker.benchmark_brain
+~~~
+
+The isolated benchmark does **not** load Chatterbox and tells Ollama to unload the model after the test. It is not a full speech-to-speech benchmark. Report the time and RAM after the test, not any credentials.
+
+Source: official upstream [Ollama Linux installation documentation](https://github.com/ollama/ollama/blob/main/docs/linux.mdx).
+
 ## 7 — MVP decision gate
 
 - Listen to both styles across several sentences; sample-based cloning may not replicate the original emotional expression.
