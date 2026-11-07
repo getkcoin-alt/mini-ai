@@ -38,6 +38,10 @@ jobs:
         run: |
           python -m services.voice_worker.benchmark_pipeline --help >/dev/null
           python -m compileall -q services/voice_worker/benchmark_pipeline.py
+      - name: Validate resident CPU voice benchmark without downloading models
+        run: |
+          python -m services.voice_worker.benchmark_resident --help >/dev/null
+          python -m compileall -q services/voice_worker/benchmark_resident.py
       - name: Test private dual-style audio reference importer
         run: |
           python - <<'PY'
