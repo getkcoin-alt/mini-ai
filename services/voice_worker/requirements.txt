@@ -1,0 +1,9 @@
+# Local Mini AI voice worker (Python 3.11 recommended)
+# These are runtime packages; PyTorch wheels and Chatterbox model weights are downloaded separately.
+fastapi>=0.115,<1
+uvicorn>=0.30,<1
+httpx>=0.27,<1
+faster-whisper>=1.1,<2
+chatterbox-tts>=0.1,<1
+soundfile>=0.12,<1
+numpy>=1.24,<3
