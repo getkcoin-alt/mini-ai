@@ -155,6 +155,25 @@
                 <div class="voice-card-header"><span><span class="status-dot"></span> MINI IS HERE</span><button class="small-text-button" id="toggle-captions" type="button" aria-pressed="true">◫ Captions on</button></div>
                 <div class="voice-stage"><div class="stage-ring stage-ring-one"></div><div class="stage-ring stage-ring-two"></div><div class="stage-specks">✦ <span>✧</span> ✳</div><div class="companion-orb orb-app" id="app-orb" aria-label="Mini companion visual"><div class="orb-sheen"></div><div class="orb-face"><span class="orb-eyes"><i></i><i></i></span><span class="orb-smile"></span></div><div class="orb-core"></div></div><div class="voice-stage-name" id="mini-display-name">mini</div><div class="voice-state" id="voice-state">Ready when you are.</div></div>
                 <div class="voice-controls"><button class="icon-control" id="replay-reply" type="button" title="Replay Mini's last response" aria-label="Replay last response">◖))</button><button class="talk-button" id="talk-button" type="button" aria-label="Start voice conversation"><span id="talk-icon">🎙</span></button><button class="icon-control" id="stop-speaking" type="button" title="Stop Mini speaking" aria-label="Stop speaking">▣</button></div><p class="voice-helper" id="voice-helper">Tap the microphone to talk · Browser speech preview</p><div class="voice-engine-indicator"><span class="status-dot"></span><span id="voice-engine-status">BROWSER DEMO · PRIVATE VOICE WORKER OFFLINE</span></div>
+                <section class="mini-realtime-panel" id="mini-realtime-panel" aria-label="Mini realtime voice">
+                  <div class="mini-realtime-topline">
+                    <div><span class="mini-realtime-kicker">MINI LIVE · MODULAR VOICE</span><h3>Talk naturally. <em>Interrupt anytime.</em></h3></div>
+                    <span class="mini-realtime-badge" id="mini-realtime-badge">Gateway offline</span>
+                  </div>
+                  <div class="mini-realtime-flow" aria-label="Realtime voice pipeline">
+                    <span data-mini-stage="vad"><strong>01</strong> Silero VAD</span>
+                    <span data-mini-stage="stt"><strong>02</strong> Local STT</span>
+                    <span data-mini-stage="llm"><strong>03</strong> Ollama</span>
+                    <span data-mini-stage="tts"><strong>04</strong> Kyutai voice</span>
+                  </div>
+                  <div class="mini-realtime-signal" aria-hidden="true"><span id="mini-realtime-meter"></span></div>
+                  <div class="mini-realtime-actions">
+                    <button id="mini-realtime-toggle" class="button button-soft" type="button" disabled>Connect live voice</button>
+                    <button id="mini-realtime-interrupt" class="button button-outline" type="button" disabled>Stop Mini talking</button>
+                  </div>
+                  <div class="mini-realtime-bottom"><p id="mini-realtime-availability" role="status" aria-live="polite">Sign in to check whether the private voice engine is ready.</p><span id="mini-realtime-latency">First meaningful audio: not measured</span></div>
+                  <p class="mini-realtime-privacy">Mic audio stays in the authenticated session. No public NFC port, no third-party hosted voice API. Voice streaming stays disabled until your private gateway and approved Friend/Mentor voices pass testing.</p>
+                </section>
                 <div id="transcript-panel" class="transcript-panel"><div><span>YOU</span><p id="user-transcript">Your words will appear here.</p></div><div><span>MINI</span><p id="mini-transcript">“Hey! I'm glad you're here. What's going on?”</p></div></div>
                 <button id="type-toggle" class="text-toggle" type="button">Prefer to type? <span>Open text input ↓</span></button>
                 <form id="type-form" class="type-form hidden"><input id="type-input" type="text" placeholder="Tell Mini what's on your mind..." aria-label="Message to Mini"><button type="submit" aria-label="Send message">↗</button></form>
