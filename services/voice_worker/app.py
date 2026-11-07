@@ -17,7 +17,7 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, WebSocket
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -302,6 +302,14 @@ def preview_turn(data: VoiceTurnRequest):
 @app.get("/health")
 def health():
     return {"service": "mini-private-local-voice", "status": "up"}
+
+
+@app.websocket("/api/voice/realtime")
+@app.websocket("/v1/realtime")
+async def realtime_voice_ws(websocket: WebSocket):
+    from . import realtime
+    session = realtime.MiniRealtimeSession(websocket)
+    await session.handle_connection()
 
 
 DIST = Path(__file__).resolve().parents[2] / "dist"
