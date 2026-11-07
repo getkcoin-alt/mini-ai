@@ -8,7 +8,7 @@ import {
 // Auth UI adapter. A verified account never accepts a hard-coded demo verification code.
 // Capture listeners intercept the legacy demo handlers without rewriting the
 // existing voice/animation/onboarding modules.
-export function installMiniAccountUI({ onVerified, onState, getProfile, onSignOut, notify }) {
+export function installMiniAccountUI({ onVerified, onState, getProfile, onProfileLoaded, onSignOut, notify }) {
   let enabled = false;
   let whatsAppEnabled = false;
   let user = null;
@@ -32,6 +32,7 @@ export function installMiniAccountUI({ onVerified, onState, getProfile, onSignOu
       try {
         const value = await readMiniProfile();
         readout.textContent = value ? 'Your private account profile is saved.' : 'No private account profile saved yet.';
+        if (value && typeof onProfileLoaded === 'function') onProfileLoaded(value);
       } catch { readout.textContent = 'Could not load private profile.'; }
     }
   }
