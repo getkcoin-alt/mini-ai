@@ -3,7 +3,7 @@
 > **Single source of truth for the feature sequence.** Updated: 2026-11-07.  
 > Source repository: `getkcoin-alt/mini-ai`. Reference engine: `getkcoin-alt/itsmay` (read-only in this phase).
 >
-> **Current state:** Interactive **frontend-only concept**, not production authentication or a connected AI voice service. A checkbox indicates a deliverable is actually present, not merely designed.
+> **Current state:** Phase 1A frontend deployed; Phase 1B private voice modules verified on scrizaone (Ollama + Chatterbox). The NFC guest, full microphone-to-voice test, public authentication and multi-user identity are **not yet operational**. Checkboxes distinguish code from live integration.
 
 ## North star
 
@@ -51,8 +51,8 @@ The competitive advantage is **trustworthy continuity + personal relevance + dep
 - [x] Add reference-upload permission, remove reference, voice playback preview, typed replies and segment-based speech-turn UI.
 - [x] Add authenticated HTTPS Vercel gateway to the private model service; no voice model or audio samples committed to Git.
 - [x] Add Node gateway/auth tests and a successful Vercel frontend build.
-- [ ] Obtain the owner's authorized reference voice sample. **Cannot clone the existing ElevenLabs weights directly**.
-- [ ] Start and benchmark the model on the selected physical GPU/CPU. No live end-to-end voice cloning result has been verified.
+- [x] Obtain authorized Friend and Mentor reference recordings, stored privately, not in Git. No ElevenLabs voice weights exported.
+- [x] Benchmark Chatterbox Nano and Ollama 1B on scrizaone CPU. Verified warm text-to-voice turns of ~11–13s for short replies; no microphone STT included.
 - [ ] Securely connect the GPU worker to the hosted mobile app and test end-to-end audio.
 - [ ] Continuous low-latency duplex streaming and natural interruptions (current prototype records one short voice turn at a time).
 
@@ -61,19 +61,33 @@ See `docs/VOICE-INTEGRATION.md`. Voice cloning itself is **not** a finished live
 ### New inference-host evaluation — nfc (2026-11-07)
 
 - [x] Document the additional Ubuntu 24.04 **nfc** host (20 physical Xeon Gold 6138 cores / 40 threads, 128 GB total RAM, ~60 GB available, ~732 GB SSD free) and prepare a non-disruptive CPU benchmark plan.
-- [ ] Confirm actual NVIDIA/other GPU availability, CPU quotas, NUMA and active production workloads with a **read-only** preflight. Do not infer GPU presence from CPU/RAM specifications.
+- [x] Read-only NFC audit: 40 logical threads, 1 NUMA node, no NVIDIA detected, ~84 GiB available RAM, active libvirt pools/network, running Windows VM and stopped ayush guest.
 - [ ] Benchmark fixed-text Chatterbox Nano voice synthesis at 8/12/16 CPU threads and compare with measured scrizaone performance.
 - [ ] If safe and faster, migrate only the private inference backend to nfc; leave the Vercel frontend and other repositories unchanged.
 - [ ] Wire the authenticated HTTPS gateway to the selected backend only after memory, latency and security checks pass.
 
 Runbook: [nfc server plan](PHASE-1B-NFC-SERVER.md). The current working inference remains on **scrizaone** until nfc testing proves otherwise.
 
+### Phase 1B owner-pilot code delivered — deployment validation pending
+
+- [x] Server-side verified Google ID-token/session implementation restricted to the configured pilot owner (Google client ID not yet provided).
+- [x] Single-inference-turn guard, cold/warm RAM thresholds, optional model prewarm, and concise Friend/Mentor response prompts.
+- [x] Opt-in single-owner SQLite profile facts in private worker, with explicit browser save/forget and REST routes; unit tests verify consent and deletion.
+- [x] NFC libvirt dry-run and guarded provisioning script, dedicated non-root guest service with CPU/RAM limits, and checksum-pinned local frontend builder.
+- [x] Local HTTP text/recorded-speech-to-voice smoke-test script with WAV verification.
+- [ ] Actually create/boot the NFC VM on the user's libvirt host; ChatGPT has no working direct SSH execution connection to NFC.
+- [ ] Install models and voice references inside the guest; run and inspect actual HTTP smoke test and first microphone-to-voice conversation from Mac.
+- [ ] Connect a protected HTTPS worker gateway + real Google OAuth client on the Vercel production deployment.
+- [ ] Replace demo email code and WhatsApp OTP with real provider-backed flows and multi-tenant identity/storage, plus quotas and abuse controls.
+
+See [release gate and exact setup](PHASE-1A-1B-RELEASE-GATE.md). A private owner pilot may be tested before public multi-user launch; neither completion should be claimed until its acceptance criteria pass.
+
 ## Phase 1B — first **real** AI MVP (implement in this order)
 
 - [ ] **1. Secure identity gateway:** Google OIDC using auth-code/PKCE, email magic link or server-verified OTP, and WhatsApp OTP via Scriwo server-to-server flow with abuse/rate limits, expiry, resend rules, consent and verified phone binding.
 - [ ] **2. Per-user tenant isolation:** One user ID per person; companion nickname, mode, profile, chat sessions and memory partitioned by authenticated user. No shared tenant data.
 - [ ] **3. Streaming voice path:** microphone -> VAD -> streaming STT -> LLM -> incremental TTS -> speaker; interruptible playback and clear mic permission controls. Target perceptible responsiveness; measure actual first-audio and turn latency before claiming metrics.
-- [ ] **4. Low-cost development stack:** use existing itsmay-supported **Ollama llama3.2:3b**, **faster-whisper**, **Piper** and optional speaker ID on a trusted GPU/CPU worker. These are open/local components, not an unlimited free public hosted voice API. The mobile/web client talks to a secure gateway.
+- [ ] **4. Low-cost development stack:** verified **Ollama llama3.2:1b + Chatterbox Nano** text-to-voice, with faster-whisper integrated but end-to-end microphone testing pending; require protected CPU worker, not an unlimited free public hosted voice API.
 - [ ] **5. LLM-guided onboarding:** ask one question at a time; extract candidate structured facts and human-readable summaries; user **approves or edits** before any memory is saved. Model output must be treated as untrusted.
 - [ ] **6. Real consented memory:** encrypted memory storage, confidence/source/time, inspect/edit/delete/export and explicit confirmation for sensitive facts; per-user isolation and voiceprint opt-in.
 - [ ] **7. Real Friend and Mentor orchestration:** retain independent principles from `itsmay/core/brain/prompts/system_mini*.md` and `core/companion/persona.py`; shared memory but different response styles; guard against false actions and hallucinations.
