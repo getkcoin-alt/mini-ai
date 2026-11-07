@@ -99,6 +99,18 @@ sudo chmod 600 /var/lib/mini-ai/voice/reference_friend.wav /var/lib/mini-ai/voic
 
 Do not commit the ZIP or WAV recordings to a public repository.
 
+### 4B. Build the private browser app inside the guest
+
+After the guest installer copies the repository to `/opt/mini-ai`, run:
+
+~~~bash
+sudo bash ~/mini-ai/scripts/build_guest_frontend.sh
+~~~
+
+This uses a checksum-pinned official Node 22 Linux binary, runs npm tests, and creates `/opt/mini-ai/dist` without replacing the guest OS's Node. It needs network access, curl and tar; it runs only inside the new guest. `virt-install` must have booted the guest and cloud-init established the `ubuntu` user first.
+
+After the worker is running, an SSH tunnel from your Mac can open the private Mini app at `http://127.0.0.1:8765` on the Mac. Do not point browsers to the guest's private 192.168.x.x address directly, and do not forward port 8765 publicly. To tunnel through the nfc jump host, use the matching SSH identity for each hop.
+
 ### 5. Start only the private VM worker and run a genuine model test
 
 ~~~bash
