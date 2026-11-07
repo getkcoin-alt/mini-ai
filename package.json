@@ -12,7 +12,8 @@
     "test": "node --test"
   },
   "dependencies": {
-    "google-auth-library": "11.3.3"
+    "google-auth-library": "11.3.3",
+    "@supabase/supabase-js": "2.119.0"
   },
   "devDependencies": {
     "vite": "7.1.12"
