@@ -14,4 +14,13 @@ if [ ! -d dist ]; then
   exit 1
 fi
 # Only loopback is permitted for the local no-auth preview.
-python3 -m uvicorn services.voice_worker.app:app --host 127.0.0.1 --port 8765
+export MINI_OLLAMA_MODEL="${MINI_OLLAMA_MODEL:-llama3.2:1b}"
+export MINI_WHISPER_MODEL="${MINI_WHISPER_MODEL:-tiny.en}"
+export MINI_CPU_THREADS="${MINI_CPU_THREADS:-2}"
+export OMP_NUM_THREADS="${OMP_NUM_THREADS:-2}"
+export MKL_NUM_THREADS="${MKL_NUM_THREADS:-2}"
+if [[ ! -x .venv/bin/python ]]; then
+  echo "No Python virtual environment. Run bash services/voice_worker/setup_cpu_ubuntu.sh first." >&2
+  exit 1
+fi
+exec .venv/bin/python -m uvicorn services.voice_worker.app:app --host 127.0.0.1 --port 8765 --workers 1
