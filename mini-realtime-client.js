@@ -32,6 +32,7 @@ export class MiniRealtimeSession {
     this.cancelledStreamIds = new Set();
     this.lastPlayedMs = 0;
     this.audioStartedAt = null;
+    this.responseFinished = false;
     this.speechStoppedAt = null;
     this.closed = false;
     this.hasStartedSpeech = false;
@@ -146,6 +147,7 @@ export class MiniRealtimeSession {
         this.streamId = null;
         this.lastPlayedMs = 0;
         this.audioStartedAt = null;
+        this.responseFinished = false;
         this.setState('thinking');
         break;
       case 'response.text.delta':
@@ -161,19 +163,21 @@ export class MiniRealtimeSession {
         this.setState('speaking');
         break;
       case 'response.audio.end':
+        if(event.response_id===this.responseId) this.outputNode?.port.postMessage({type:'end'});
         this.emit({type:event.type,response_id:event.response_id});
         break;
       case 'response.finished':
+        if(event.response_id!==this.responseId) break;
+        this.responseFinished=true;
         this.emit({type:event.type,response_id:event.response_id});
-        this.responseId = null;
-        this.streamId = null;
-        this.setState('listening');
+        // Audio may still be inside the browser jitter buffer. Keep its
+        // response ID live so user interruption can cancel unheard context.
+        if(this.streamId===null) this.finishHeardResponse();
         break;
       case 'response.cancelled':
+        if(event.response_id && event.response_id!==this.responseId) break;
         this.outputNode?.port.postMessage({type:'flush'});
-        this.responseId = null;
-        this.streamId = null;
-        this.setState('listening');
+        this.finishHeardResponse();
         break;
       case 'session.error':
         this.fail(new Error(String(event.message||'Voice session failed').slice(0,180)));
@@ -219,6 +223,14 @@ export class MiniRealtimeSession {
     this.emit({type:'ui.mic.ready'});
   }
 
+  finishHeardResponse() {
+    this.responseId=null;
+    this.streamId=null;
+    this.responseFinished=false;
+    this.audioStartedAt=null;
+    this.setState('listening');
+  }
+
   playbackEvent(event) {
     if(this.closed) return;
     if(event.type==='overflow') {
@@ -230,6 +242,11 @@ export class MiniRealtimeSession {
           Math.max(0,Math.round(this.audioStartedAt-this.speechStoppedAt));
         this.emit({type:'ui.first.meaningful.audio',milliseconds:meaningfulAudioMs});
       }
+    } else if(event.type==='playback.drain' && this.responseId) {
+      this.lastPlayedMs=Math.max(this.lastPlayedMs,Number(event.milliseconds)||0);
+      this.send({type:'playback.progress',response_id:this.responseId,
+        heard_ms:Math.floor(this.lastPlayedMs),final:true});
+      if(this.responseFinished) this.finishHeardResponse();
     } else if(event.type==='playback.progress' && this.responseId) {
       this.lastPlayedMs=Math.max(this.lastPlayedMs,Number(event.milliseconds)||0);
       this.send({type:'playback.progress',response_id:this.responseId,
@@ -244,7 +261,7 @@ export class MiniRealtimeSession {
     this.send({type:'response.cancel',response_id:this.responseId,
       heard_ms:Math.floor(this.lastPlayedMs), reason});
     this.emit({type:'ui.interrupted',reason,heard_ms:this.lastPlayedMs});
-    this.responseId=null;this.streamId=null;this.audioStartedAt=null;
+    this.responseId=null;this.streamId=null;this.audioStartedAt=null;this.responseFinished=false;
     this.setState('listening');
   }
 
