@@ -67,7 +67,7 @@ def status():
         "referenceModes": {mode: path.is_file() and path.stat().st_size > 10000 for mode, path in REFERENCES.items()},
         "ttsEngine": "Chatterbox (zero-shot reference voice)",
         "sttEngine": "faster-whisper",
-        "brain": os.environ.get("MINI_OLLAMA_MODEL", "llama3.2:3b"),
+        "brain": os.environ.get("MINI_OLLAMA_MODEL", "llama3.2:1b"),
         "modelLoaded": bool(_TTS_MODELS),
         "referenceStoredOn": "private-worker-disk",
     }
@@ -186,13 +186,15 @@ def transcribe(audio: bytes):
         if _WHISPER is None:
             hardware = "cuda" if torch.cuda.is_available() else "cpu"
             _WHISPER = WhisperModel(
-                os.environ.get("MINI_WHISPER_MODEL", "base"),
+                os.environ.get("MINI_WHISPER_MODEL", "tiny.en" if hardware == "cpu" else "base"),
                 device=hardware, compute_type="float16" if hardware == "cuda" else "int8",
+                cpu_threads=int(os.environ.get("MINI_CPU_THREADS", "2")) if hardware == "cpu" else 0,
+                num_workers=1,
             )
         with tempfile.NamedTemporaryFile(suffix=".wav") as file:
             file.write(wav)
             file.flush()
-            segments, info = _WHISPER.transcribe(file.name, vad_filter=True, beam_size=3)
+            segments, info = _WHISPER.transcribe(file.name, vad_filter=True, beam_size=1)
             utterance = " ".join(seg.text.strip() for seg in segments).strip()
         return utterance[:1200], info.language or "en"
 
@@ -211,13 +213,13 @@ def reply_to(text: str, *, mode: str, language: str = "en") -> str:
     try:
         with httpx.Client(timeout=80, trust_env=False) as client:
             response = client.post(url + "/api/chat", json={
-                "model": os.environ.get("MINI_OLLAMA_MODEL", "llama3.2:3b"),
+                "model": os.environ.get("MINI_OLLAMA_MODEL", "llama3.2:1b"),
                 "stream": False,
                 "messages": [
                     {"role": "system", "content": system},
                     {"role": "user", "content": text[:1200]},
                 ],
-                "options": {"temperature": 0.75, "num_predict": 150}
+                "options": {"temperature": 0.75, "num_predict": 105, "num_ctx": 2048, "num_thread": int(os.environ.get("MINI_CPU_THREADS", "2"))}
             })
             response.raise_for_status()
             answer = str(response.json().get("message", {}).get("content", "")).strip()
