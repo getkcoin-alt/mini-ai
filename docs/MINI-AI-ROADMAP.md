@@ -1,7 +1,7 @@
 # Mini AI — product delivery roadmap
 
 > **Single source of truth for the feature sequence.** Updated: 2026-11-07.  
-> Source repository: \`getkcoin-alt/mini-ai\`. Reference engine: \`getkcoin-alt/itsmay\` (read-only in this phase).
+> Source repository: `getkcoin-alt/mini-ai`. Reference engine: `getkcoin-alt/itsmay` (read-only in this phase).
 >
 > **Current state:** Interactive **frontend-only concept**, not production authentication or a connected AI voice service. A checkbox indicates a deliverable is actually present, not merely designed.
 
@@ -13,8 +13,8 @@ The competitive advantage is **trustworthy continuity + personal relevance + dep
 
 ## Boundary between the two repositories
 
-- \`mini-ai\` owns Mini's new user-facing app: graphics, signup/onboarding UI, personal connection design, voice UI, mobile UX, hardware pairing UX and Mini-specific client code.
-- \`itsmay\` retains the other programs and shared engine code; nothing from that repository is copied or deleted in Phase 1. Its \`core/companion\`, prompt files, SQLite memory, voiceprint, Ollama, faster-whisper and Piper implementations are reference material for **future backend adapters**, not currently connected to this frontend.
+- `mini-ai` owns Mini's new user-facing app: graphics, signup/onboarding UI, personal connection design, voice UI, mobile UX, hardware pairing UX and Mini-specific client code.
+- `itsmay` retains the other programs and shared engine code; nothing from that repository is copied or deleted in Phase 1. Its `core/companion`, prompt files, SQLite memory, voiceprint, Ollama, faster-whisper and Piper implementations are reference material for **future backend adapters**, not currently connected to this frontend.
 - Scriwo is the proposed production WhatsApp OTP provider; secrets and verification must stay on a trusted server, not in this frontend.
 - Vercel hosts the lightweight public frontend only; it does **not** host an always-on local Ollama/Piper/Whisper instance.
 
@@ -23,7 +23,7 @@ The competitive advantage is **trustworthy continuity + personal relevance + dep
 - [x] Responsive identity system, organic animated face/orb, voice-wave and breathing animations; reduced-motion preference.
 - [x] Welcome graphics with clear Friend/Mentor story and mobile app-style navigation.
 - [x] Google sign-in entry design with honest "not connected" disclosure.
-- [x] Email sign-in and six-digit verification **simulation**, visibly marked demo with \`123456\`.
+- [x] Email sign-in and six-digit verification **simulation**, visibly marked demo with `123456`.
 - [x] WhatsApp number and OTP **simulation**, labeled Scriwo server integration **later**.
 - [x] Six-step Mini-led onboarding that asks natural questions: the user's name; Mini's nickname; best friend/mentor/both; conversational tone; current focus; personal boundaries.
 - [x] Answer by keyboard and, **when browser support and permission allow**, speech recognition. Mini speaks questions via browser speech synthesis.
@@ -52,7 +52,7 @@ The competitive advantage is **trustworthy continuity + personal relevance + dep
 - [ ] **4. Low-cost development stack:** use existing itsmay-supported **Ollama llama3.2:3b**, **faster-whisper**, **Piper** and optional speaker ID on a trusted GPU/CPU worker. These are open/local components, not an unlimited free public hosted voice API. The mobile/web client talks to a secure gateway.
 - [ ] **5. LLM-guided onboarding:** ask one question at a time; extract candidate structured facts and human-readable summaries; user **approves or edits** before any memory is saved. Model output must be treated as untrusted.
 - [ ] **6. Real consented memory:** encrypted memory storage, confidence/source/time, inspect/edit/delete/export and explicit confirmation for sensitive facts; per-user isolation and voiceprint opt-in.
-- [ ] **7. Real Friend and Mentor orchestration:** retain independent principles from \`itsmay/core/brain/prompts/system_mini*.md\` and \`core/companion/persona.py\`; shared memory but different response styles; guard against false actions and hallucinations.
+- [ ] **7. Real Friend and Mentor orchestration:** retain independent principles from `itsmay/core/brain/prompts/system_mini*.md` and `core/companion/persona.py`; shared memory but different response styles; guard against false actions and hallucinations.
 - [ ] **8. MVP health metrics:** signup completion, time to first spoken reply, session reconnect, STT errors by browser, successful interrupt, helpfulness, second-week return use, memory correction rate and cost per voice minute.
 - [ ] **9. Security testing:** device/session revocation, request quotas, OTP abuse, prompt injection, data separation, speech privacy notice, accessibility and age-appropriate protections.
 
