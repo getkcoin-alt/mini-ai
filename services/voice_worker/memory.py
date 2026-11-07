@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+from contextlib import closing
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -31,7 +32,7 @@ def connect():
 
 
 def get_profile():
-    with connect() as db:
+    with closing(connect()) as db:
         row = db.execute("SELECT profile_json, updated_at FROM owner_profile WHERE id=?", ("primary",)).fetchone()
     if row is None:
         return {"saved": False, "profile": {}, "updatedAt": None}
@@ -58,7 +59,7 @@ def save_profile(payload: dict, consent: bool):
     if len(json.dumps(profile)) > 2000:
         raise ValueError("Profile is too large.")
     updated = datetime.now(timezone.utc).isoformat()
-    with connect() as db:
+    with closing(connect()) as db:
         db.execute("INSERT INTO owner_profile(id, profile_json, updated_at) VALUES(?,?,?) "
                    "ON CONFLICT(id) DO UPDATE SET profile_json=excluded.profile_json, updated_at=excluded.updated_at",
                    ("primary", json.dumps(profile, ensure_ascii=False), updated))
@@ -67,7 +68,7 @@ def save_profile(payload: dict, consent: bool):
 
 
 def delete_profile():
-    with connect() as db:
+    with closing(connect()) as db:
         changed = db.execute("DELETE FROM owner_profile WHERE id=?", ("primary",)).rowcount
         db.commit()
     return {"deleted": bool(changed), "saved": False}
