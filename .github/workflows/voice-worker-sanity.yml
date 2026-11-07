@@ -7,6 +7,8 @@ on:
       - "scripts/nfc_vm_preflight.sh"
       - "scripts/nfc_create_mini_vm.sh"
       - "scripts/mini_guest_setup.sh"
+      - "scripts/build_guest_frontend.sh"
+      - "scripts/smoke_local_voice.py"
       - ".github/workflows/voice-worker-sanity.yml"
   pull_request:
     paths:
@@ -14,6 +16,8 @@ on:
       - "scripts/nfc_vm_preflight.sh"
       - "scripts/nfc_create_mini_vm.sh"
       - "scripts/mini_guest_setup.sh"
+      - "scripts/build_guest_frontend.sh"
+      - "scripts/smoke_local_voice.py"
 permissions:
   contents: read
 jobs:
@@ -38,6 +42,10 @@ jobs:
         run: bash -n scripts/nfc_create_mini_vm.sh
       - name: Check nonprivileged Mini guest install script syntax
         run: bash -n scripts/mini_guest_setup.sh
+      - name: Check pinned private frontend build script syntax
+        run: bash -n scripts/build_guest_frontend.sh
+      - name: Check private HTTP voice smoke test syntax
+        run: python -m compileall -q scripts/smoke_local_voice.py
       - name: Check benchmark imports in both direct and module modes
         run: |
           python - <<'PY'
