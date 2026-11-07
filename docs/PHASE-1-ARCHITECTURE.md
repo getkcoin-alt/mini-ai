@@ -1,7 +1,7 @@
 # Mini AI — Phase 1 architecture & interaction contract
 
 Updated: 2026-11-07  
-Scope: **graphic-led frontend-first demo**, hosted as static web on Vercel. No changes to \`itsmay\` in this delivery.
+Scope: **graphic-led frontend-first demo**, hosted as static web on Vercel. No changes to `itsmay` in this delivery.
 
 ## 0. What exists today
 
@@ -9,7 +9,7 @@ This repository started with a LICENSE only. The new UI is dependency-free stati
 
 ### Screen map
 
-\`\`\`
+```
 Landing / living Mini graphic
   ├── Explore concept (guest-only voice UI)
   └── Start
@@ -31,7 +31,7 @@ Landing / living Mini graphic
                                  ├── Memories (planned)
                                  ├── Devices (planned)
                                  └── Preferences / clear local demo data
-\`\`\`
+```
 
 ## 1. Design primitives
 
@@ -39,12 +39,12 @@ Landing / living Mini graphic
 - The playful face carries Mini's presence; minimal choreography to avoid feeling gimmicky.
 - Voice CTA remains visually dominant. Transcripts are optional for accessibility.
 - Mobile application shell with thumb-reachable bottom navigation; desktop dashboard with sidebar.
-- \`prefers-reduced-motion\` disables animations.
+- `prefers-reduced-motion` disables animations.
 - No "human AI" impersonation; copy says Mini is an AI.
 
 ## 2. Onboarding dialogue data model (mock local state)
 
-\`\`\`ts
+```ts
 type MiniProfile = {
   name: string;
   miniName: string;
@@ -58,13 +58,13 @@ type ProfileDraft = {
   completed: Record<keyof MiniProfile, boolean>;
   hasTalked: boolean;
 };
-\`\`\`
+```
 
-The prototype saves this object in \`localStorage\` at \`mini-ai-design-preview-v1\` only. It does not store spoken audio, transcripts, real OAuth tokens, phone verification, voiceprints or remote memories. Local storage is not appropriate for production sensitive data; replace with authenticated encrypted server storage and minimal local cache.
+The prototype saves this object in `localStorage` at `mini-ai-design-preview-v1` only. It does not store spoken audio, transcripts, real OAuth tokens, phone verification, voiceprints or remote memories. Local storage is not appropriate for production sensitive data; replace with authenticated encrypted server storage and minimal local cache.
 
 ### "Profile sync" is a transparent UI indicator, not an AI confidence score
 
-\`\`\`
+```
 Name             15%
 Mini nickname    10%
 Friend/Mentor    20%
@@ -73,19 +73,19 @@ Current focus    20%
 Boundaries       10%
 First trial talk 10%
 TOTAL           100%
-\`\`\`
+```
 
 Completion marks the field as explicitly answered. Skipped fields do not earn points. The progress meter is **not** evidence of model comprehension, friendship or emotional intimacy. Real app capabilities must never be held hostage to artificially inflate this score.
 
 ## 3. Voice-first implementation today
 
-\`\`\`
+```
 Browser microphone (SpeechRecognition where supported)
   → transcript
   → local keyword-based, prewritten demo response
   → SpeechSynthesisUtterance where supported
   → browser speaker
-\`\`\`
+```
 
 - This is **not** a free local LLM or a production speech-to-speech system.
 - Browser speech availability and network/privacy behavior varies by browser/OS. The UI provides keyboard fallback.
@@ -94,7 +94,7 @@ Browser microphone (SpeechRecognition where supported)
 
 ## 4. Future Phase 1B service architecture
 
-\`\`\`
+```
 ┌──────────── Mini web / native client ────────────────┐
 │ Mic, VAD preview, local captions, permission UI      │
 │ Profile confirmation + corrections + sync indicator │
@@ -122,22 +122,22 @@ Browser microphone (SpeechRecognition where supported)
                       │
                 Isolated encrypted storage
                 + audit + consent log
-\`\`\`
+```
 
-Itsmay already implements a **separate device-oriented local companion** under \`core/companion/\`; future integration requires checking its tenant model, auth and API constraints before exposing any service publicly. Do not expose its local APIs directly to anonymous browsers.
+Itsmay already implements a **separate device-oriented local companion** under `core/companion/`; future integration requires checking its tenant model, auth and API constraints before exposing any service publicly. Do not expose its local APIs directly to anonymous browsers.
 
 ### Suggested API contract (proposal, not currently implemented)
 
 | Action | Proposed endpoint | Required server behavior |
 | --- | --- | --- |
-| Start sign-in | \`POST /v1/auth/start\` | provider-specific flow, rate limiting |
-| Verify email/phone | \`POST /v1/auth/verify\` | server validates code/token; no browser-supplied secret |
-| Get/update profile | \`GET/PATCH /v1/me/mini-profile\` | authenticated user namespace and schema |
-| Understand answer | \`POST /v1/mini/onboarding/interpret\` | LLM suggests structured draft; user confirms |
-| Voice session | \`WSS /v1/mini/voice\` | auth token, audio chunks, interruption, end-of-turn, status |
-| Memory consent | \`POST /v1/mini/memories/confirm\` | confirm, redact, store and audit |
-| Memory control | \`GET/DELETE /v1/mini/memories/:id\` | inspect and erase within user namespace |
-| Pairing start | \`POST /v1/mini/devices/pair\` | authenticated, challenge-bound device ownership |
+| Start sign-in | `POST /v1/auth/start` | provider-specific flow, rate limiting |
+| Verify email/phone | `POST /v1/auth/verify` | server validates code/token; no browser-supplied secret |
+| Get/update profile | `GET/PATCH /v1/me/mini-profile` | authenticated user namespace and schema |
+| Understand answer | `POST /v1/mini/onboarding/interpret` | LLM suggests structured draft; user confirms |
+| Voice session | `WSS /v1/mini/voice` | auth token, audio chunks, interruption, end-of-turn, status |
+| Memory consent | `POST /v1/mini/memories/confirm` | confirm, redact, store and audit |
+| Memory control | `GET/DELETE /v1/mini/memories/:id` | inspect and erase within user namespace |
+| Pairing start | `POST /v1/mini/devices/pair` | authenticated, challenge-bound device ownership |
 
 No endpoint above is live. The browser **must not** hold Scriwo API secrets, Google client secrets, private keys, or model-provider credentials.
 
@@ -171,8 +171,8 @@ Start with a mobile app owning the session. Pair a BLE accessory for secure devi
 
 ### Source references
 
-- \`itsmay/docs/mini.md\`: existing fully-local engine direction.
-- \`itsmay/core/brain/prompts/system_mini.md\`: warm friend personality.
-- \`itsmay/core/brain/prompts/system_mini_mentor.md\`: candid mentor personality.
-- \`itsmay/core/companion/profiles.py\`: device local per-person profile and memory namespace.
-- \`itsmay/docs/strategy.md\`: narrow, measurable differentiation, memory and execution.
+- `itsmay/docs/mini.md`: existing fully-local engine direction.
+- `itsmay/core/brain/prompts/system_mini.md`: warm friend personality.
+- `itsmay/core/brain/prompts/system_mini_mentor.md`: candid mentor personality.
+- `itsmay/core/companion/profiles.py`: device local per-person profile and memory namespace.
+- `itsmay/docs/strategy.md`: narrow, measurable differentiation, memory and execution.
