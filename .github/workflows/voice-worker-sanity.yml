@@ -22,6 +22,8 @@ jobs:
           python-version: "3.11"
       - name: Check Python syntax (does not download model weights)
         run: python -m compileall -q services/voice_worker
+      - name: Test shared-VPS memory limits and voice-request serialization
+        run: python -m unittest discover -s services/voice_worker/tests -p 'test_*.py' -v
       - name: Check CPU and local startup shell scripts
         run: bash -n services/voice_worker/setup_cpu_ubuntu.sh services/voice_worker/start-local.sh services/voice_worker/linux_preflight.sh
       - name: Check benchmark imports in both direct and module modes
