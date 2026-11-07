@@ -176,8 +176,17 @@ async def run_live_turn(ws):
             except Exception:
                 push({"type": "error", "status": 502, "message": "Private Mini streaming turn failed."})
             finally:
-                loop.call_soon_threadsafe(lambda: queue.put_nowait({"type": "_closed"})
-                                          if not queue.full() else cancel.set())
+                # Even if a burst of token callbacks filled the bounded queue,
+                # sender must ALWAYS receive a final marker and release the socket.
+                def send_end_marker():
+                    if queue.full():
+                        cancel.set()
+                        try:
+                            queue.get_nowait()
+                        except asyncio.QueueEmpty:
+                            pass
+                    queue.put_nowait({"type": "_closed"})
+                loop.call_soon_threadsafe(send_end_marker)
 
         worker = asyncio.create_task(asyncio.to_thread(produce))
 
