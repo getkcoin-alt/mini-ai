@@ -70,13 +70,22 @@ def ffmpeg_convert(audio: bytes, *, sample_rate: int, max_secs: int) -> bytes:
     process = subprocess.run(
         ["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error",
          "-i", "pipe:0", "-t", str(max_secs), "-ac", "1",
-         "-ar", str(sample_rate), "-f", "wav", "pipe:1"],
+         "-ar", str(sample_rate), "-acodec", "pcm_s16le",
+         "-f", "s16le", "pipe:1"],
         input=audio, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         timeout=25, check=False,
     )
-    if process.returncode != 0 or len(process.stdout) < 1000:
-        raise ValueError("Could not decode the voice audio. Use a clean WAV, MP3, M4A or WebM clip.")
-    return process.stdout
+    if process.returncode != 0 or len(process.stdout) < sample_rate * 2:
+        raise ValueError("Could not decode enough speech. Use a clear WAV, MP3, M4A or WebM clip.")
+    # FFmpeg WAV files streamed to stdout have an indefinite RIFF length.
+    # Wrap decoded PCM ourselves for a correct, seekable, finite WAV header.
+    output = io.BytesIO()
+    with wave.open(output, "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(sample_rate)
+        wav.writeframes(process.stdout)
+    return output.getvalue()
 
 
 def save_reference(audio: bytes):
