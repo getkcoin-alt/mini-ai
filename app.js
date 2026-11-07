@@ -881,10 +881,11 @@ import { installMiniAccountUI } from './mini-identity-ui.js';
       };
       state.profile = { ...defaults };
       state.completed = {};
+      const answered = new Set(Array.isArray(record.completed_keys) ? record.completed_keys : []);
       for (const key of Object.keys(defaults)) {
         if (typeof saved[key] === 'string' && saved[key].trim()) {
           state.profile[key] = saved[key];
-          state.completed[key] = true;
+          if (answered.has(key)) state.completed[key] = true;
         }
       }
       refreshProfilePreview();
