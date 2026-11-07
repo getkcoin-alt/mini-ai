@@ -183,3 +183,44 @@ Source: official upstream [Ollama Linux installation documentation](https://gith
 - Keep reference audio private and allow the voice owner to replace/delete it.
 
 References: https://github.com/resemble-ai/chatterbox and the scripts under services/voice_worker in this repository.
+
+## 8 — Ollama benchmark succeeded (2026-11-07)
+
+The owner installed Ollama and independently benchmarked **llama3.2:1b** on the new server, with `MINI_CPU_THREADS=4`:
+
+| Metric | Measured |
+| --- | ---: |
+| Available RAM before Ollama | 6.63 GiB |
+| End-to-end model-call wall-clock | 4.20 s |
+| Model loading | 3.07 s |
+| Response token evaluation | 0.81 s |
+| Available RAM immediately after | 5.32 GiB |
+
+The LLM returned a coherent one-sentence answer. No simultaneous Chatterbox + Ollama inference was measured, and these figures must not be represented as a complete speech-to-speech turn.
+
+### Next: memory-isolated text → brain → cloned voice test
+
+**In a terminal on the new server:**
+
+~~~bash
+cd /root/mini-ai
+git pull --ff-only origin main
+free -h
+ollama ps
+.venv/bin/python -m services.voice_worker.benchmark_pipeline --mode friend
+~~~
+
+The new pipeline test uses **separate child processes** for reasoning and speech synthesis, so both heavy models do not remain loaded simultaneously. It checks that at least 4 GiB of memory is available before starting voice inference. The resulting file is:
+
+`/root/.mini-ai/voice/mini_friend_pipeline_test.wav`
+
+Once this works, test the Mentor style:
+
+~~~bash
+.venv/bin/python -m services.voice_worker.benchmark_pipeline --mode mentor
+~~~
+
+To additionally test Whisper, use `--audio /path/to/your_short_voice_input.wav` (a short, clear recording of the **user**, under 3 MB). Text-only tests intentionally skip speech recognition.
+
+This validates a **staged prototype**. It is not evidence of warm continuous speech streaming or safe public multi-user hosting. The Ollama adapter now sets `keep_alive=0` by default to avoid retaining its memory alongside Chatterbox. For the live service, assess separating inference across the two existing servers or another GPU before allowing concurrent user requests.
+
