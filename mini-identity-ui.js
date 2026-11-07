@@ -5,7 +5,7 @@ import {
   listMiniMemories, rememberMiniFact, forgetMiniFact
 } from './mini-supabase.js';
 
-// Auth UI adapter. A real account NEVER inherits the demo-only 123456 flow.
+// Auth UI adapter. A verified account never accepts a hard-coded demo verification code.
 // Capture listeners intercept the legacy demo handlers without rewriting the
 // existing voice/animation/onboarding modules.
 export function installMiniAccountUI({ onVerified, onState, getProfile, onSignOut, notify }) {
