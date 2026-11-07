@@ -11,6 +11,9 @@ on:
       - "scripts/smoke_local_voice.py"
       - "scripts/benchmark_pocket_tts.py"
       - "scripts/benchmark_streaming_brain.py"
+      - "mini-live-browser.js"
+      - "app.js"
+      - "tests/mini-live-client.test.mjs"
       - ".github/workflows/voice-worker-sanity.yml"
   pull_request:
     paths:
@@ -22,6 +25,9 @@ on:
       - "scripts/smoke_local_voice.py"
       - "scripts/benchmark_pocket_tts.py"
       - "scripts/benchmark_streaming_brain.py"
+      - "mini-live-browser.js"
+      - "app.js"
+      - "tests/mini-live-client.test.mjs"
 permissions:
   contents: read
 jobs:
@@ -66,6 +72,15 @@ jobs:
           runpy.run_module("services.voice_worker.benchmark_cpu", run_name="import_probe")
           print("Benchmark import-path smoke test: PASS")
           PY
+      - name: Set up Node for private streaming browser tests
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.16.0"
+      - name: Verify localhost-only client and browser source syntax
+        run: |
+          node --check mini-live-browser.js
+          node --check app.js
+          node --test tests/mini-live-client.test.mjs
       - name: Check staged speech pipeline CLI without loading models
         run: |
           python -m services.voice_worker.benchmark_pipeline --help >/dev/null
