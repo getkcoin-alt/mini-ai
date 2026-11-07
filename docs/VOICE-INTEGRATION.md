@@ -14,6 +14,32 @@ The Mini frontend now has a **voice reference upload**, a local-model status ind
 
 **No ElevenLabs API key, ElevenLabs Agent, ElevenLabs model weights, or per-character ElevenLabs billing is used by this Mini AI speech pipeline.**
 
+## November 7 voice sample pack — two personality references
+
+The owner supplied two audio examples during Phase 1B intake. The private reference package is available as a conversation attachment (it is deliberately **not** committed into the public GitHub repository).
+
+- **Friend:** `mini_voice_bright_24k.wav` — 10.80 seconds, lively/animated reference.
+- **Mentor:** `mini_voice_calm_24k.wav` — 10.54 seconds, quiet/deliberate reference.
+- Both are mono 24 kHz 16-bit PCM WAV; these are **conditioning samples**, not a trained voice model.
+- These audio examples are generated ElevenLabs output. ElevenLabs' current terms restrict certain uses of outputs to develop or improve AI models or competing services. **Confirm your specific reuse rights or obtain original independently licensed source material before using this pack for model voice cloning.** See https://elevenlabs.io/terms-of-use and https://elevenlabs.io/use-policy.
+
+When permitted, copy the ZIP to the private Linux machine and install both voice styles:
+
+```bash
+python3 services/voice_worker/install_reference_pack.py \
+  /path/to/Mini_AI_Phase1B_Voice_References.zip --confirm-rights
+```
+
+The installer validates the audio format, refuses unexpected sample sizes and writes restricted-access files to the private voice directory.
+
+### Linux hardware preflight (share output without any credentials)
+
+```bash
+bash services/voice_worker/linux_preflight.sh
+```
+
+This reveals OS, CPUs, RAM, free disk space, whether an NVIDIA GPU is available, and whether Python/ffmpeg/Node/Ollama are installed. Do not share SSH passwords, keys, server tokens or API secrets. An NVIDIA GPU is strongly preferred for responsive voice inference; CPU Nano fallback is available for English but will usually be less responsive.
+
 ## Private local workstation setup (GPU recommended)
 
 1. Install Node.js 22, Python 3.11, ffmpeg, and [Ollama](https://ollama.com/).
@@ -47,7 +73,7 @@ The Mini frontend now has a **voice reference upload**, a local-model status ind
    python -m uvicorn services.voice_worker.app:app --host 127.0.0.1 --port 8765
    ```
 
-6. Open **http://127.0.0.1:8765**. Continue in demo mode; open **Preferences**. The voice section should report *Local worker running*. Upload a 5–20-second clean voice example, check the permission confirmation, and tap **Use this voice for Mini**. Test the generated voice. Your original reference is saved only on the private worker under `~/.mini-ai/voice/reference.wav` (override with `MINI_VOICE_DATA_DIR`).
+6. Open **http://127.0.0.1:8765**. Continue in demo mode; open **Preferences**. The voice section should report *Local worker running*. Upload a 5–20-second clean voice example, check the permission confirmation, and tap **Use this voice for Mini**. Test the generated voice. Your references are saved only on the private worker as `~/.mini-ai/voice/reference_friend.wav` and `reference_mentor.wav` (override with `MINI_VOICE_DATA_DIR`). The style selector routes Friend and Mentor through different clips; one installed clip can temporarily serve both modes.
 
 7. In **My Space**, tapping the microphone records up to 12 seconds; tapping again sends the segment through Whisper, Ollama and Chatterbox. This is a **turn-based voice prototype**, not yet continuous full-duplex speech. You can stop playback or type an answer.
 
@@ -74,7 +100,7 @@ The remote `/v1/*` routes require `MINI_WORKER_TOKEN`. The browser never sees th
 
 ## Required production improvements
 
-- Voice sample editing, multiple references per user and voice-profile isolation; worker currently holds **one** reference for a **single-owner prototype**.
+- Voice sample editing, multiple references **per person** and voice-profile isolation; the worker currently supports **two style references for one owner**, not multi-user isolation.
 - Streaming STT, incremental LLM tokens, streaming TTS chunks and true interruption for lower latency.
 - Rate limits, model queue, warm startup, token budgets, audio retention limits and encryption at rest.
 - Real device testing for microphone/capture and language switching. Hindi detection uses language auto-detection from Whisper; typed Devanagari uses the Hindi TTS path.
