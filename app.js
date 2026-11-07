@@ -1,4 +1,5 @@
 import { createVoiceRequestGate, voiceResponseError } from './voice-request-gate.js';
+import { installMiniAccountUI } from './mini-identity-ui.js';
 
 /* Mini AI — frontend-only interactive prototype.
  * Important: browser speech APIs and scripted demo responses are NOT an AI backend,
@@ -19,7 +20,7 @@ import { createVoiceRequestGate, voiceResponseError } from './voice-request-gate
     { key: 'boundaries', question: 'Is there anything you want me to respect?', help: "I can listen, challenge, or give you space. You're in charge.", placeholder: '“Be honest with me, but don’t push when I say stop.”', kind: 'text' }
   ];
   const defaults = { name: '', miniName: 'Mini', relationship: 'both', tone: 'balanced', focus: '', boundaries: '' };
-  const state = { profile: { ...defaults }, completed: {}, hasTalked: false, step: 0, auth: 'google', page: 'today', mode: 'friend', isListening: false, recognizer: null, autoSpeak: true, voiceOutput: true, captions: true, lastReply: '', previewGuest: true, demoExploration: false, voiceStatus: { authReady: false, ownerSignedIn: false, workerReady: false, referenceReady: false, voiceReady: false, localStandalone: false }, voiceAbort: null, voiceAudio: null, voiceAudioUrl: null, lastAudioBase64: '', recorder: null, recordingStream: null, recordingTimer: null, sendingVoice: false, suppressPendingVoice: false, discardNextRecording: false };
+  const state = { profile: { ...defaults }, completed: {}, hasTalked: false, step: 0, auth: 'google', page: 'today', mode: 'friend', isListening: false, recognizer: null, autoSpeak: true, voiceOutput: true, captions: true, lastReply: '', previewGuest: true, demoExploration: false, voiceStatus: { authReady: false, ownerSignedIn: false, workerReady: false, referenceReady: false, voiceReady: false, localStandalone: false }, voiceAbort: null, voiceAudio: null, voiceAudioUrl: null, lastAudioBase64: '', recorder: null, recordingStream: null, recordingTimer: null, sendingVoice: false, suppressPendingVoice: false, discardNextRecording: false, supaUser: null };
 
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => Array.from(document.querySelectorAll(selector));
@@ -592,8 +593,8 @@ import { createVoiceRequestGate, voiceResponseError } from './voice-request-gate
     } catch (error) { toast('Microphone permission required: ' + error.message); }
   }
 
-  const canSyncProfile = () => Boolean(state.voiceStatus.workerReady &&
-    (state.voiceStatus.ownerSignedIn || state.voiceStatus.localStandalone));
+  const canSyncProfile = () => Boolean(state.supaUser || (state.voiceStatus.workerReady &&
+    (state.voiceStatus.ownerSignedIn || state.voiceStatus.localStandalone)));
 
   function updateMemoryUi() {
     const allowed = canSyncProfile();
@@ -604,6 +605,7 @@ import { createVoiceRequestGate, voiceResponseError } from './voice-request-gate
   }
 
   async function readMemoryStatus() {
+    if (state.supaUser) return;
     if (!canSyncProfile()) return updateMemoryUi();
     try {
       const res = await fetch('/api/voice/profile', { credentials: 'same-origin', cache: 'no-store' });
@@ -853,6 +855,17 @@ import { createVoiceRequestGate, voiceResponseError } from './voice-request-gate
     $('#header-start').addEventListener('click', () => toast('This is a local demo profile, not a signed-in account.'));
   }
    selectAuth('google');
+  void installMiniAccountUI({
+    onVerified: () => startSetup(),
+    onState: (user) => { state.supaUser = user; updateMemoryUi(); },
+    getProfile: () => ({ profile: state.profile, completed: state.completed }),
+    onSignOut: () => {
+      try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
+      state.profile = { ...defaults }; state.completed = {}; state.hasTalked = false;
+      screen('welcome');
+    },
+    notify: toast
+  }).catch(error => toast('Account connection unavailable: ' + String(error.message).slice(0,100)));
   void refreshVoiceStatus();
   refreshProfilePreview();
   refreshHome();
