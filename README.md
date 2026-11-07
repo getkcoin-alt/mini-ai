@@ -43,3 +43,9 @@ For the full sequential backlog and technical plan, see:
 - Honest disclosure of mock responses and mock verification throughout.
 
 **Our direction:** earn trust through one excellent real-time conversation before expanding into multimodal agents, cross-device continuity and physical Mini hardware.
+
+## ElevenLabs voice integration
+
+The code now supports verified owner-only Google login, protected ElevenLabs voice listing and streaming TTS, and private ElevenLabs Agent conversations through the official SDK. **It is not linked to the user's ElevenLabs account yet** because Google OAuth and ElevenLabs credentials are not configured in Vercel. The existing browser demo remains available.
+
+See [voice setup and security](docs/VOICE-INTEGRATION.md).
