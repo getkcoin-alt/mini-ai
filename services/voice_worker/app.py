@@ -13,6 +13,8 @@ import base64
 import binascii
 import hmac
 import os
+import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
@@ -20,9 +22,25 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import engine
+from . import engine, resource_limits
 
-app = FastAPI(title="Mini AI Private Voice Worker", docs_url=None, redoc_url=None, openapi_url=None)
+logger = logging.getLogger("mini.voice")
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Optional; only enable after measuring sufficient RAM on this shared VPS.
+    if os.environ.get("MINI_PRELOAD_TTS", "0") == "1" and engine.reference_for("friend"):
+        try:
+            with resource_limits.reserve_inference(model_loaded=False):
+                engine._get_tts("en")
+            logger.info("Chatterbox Nano loaded once for the private voice worker")
+        except (resource_limits.VoiceMemoryLow, resource_limits.VoiceBusy, Exception) as exc:
+            logger.warning("Optional voice prewarm unavailable; running cold: %s", exc)
+    yield
+
+
+app = FastAPI(title="Mini AI Private Voice Worker", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
 MAX_BASE64_LENGTH = 4_100_000
 
 
@@ -104,7 +122,10 @@ def wrap_audio(wav: bytes, *, transcript: str = "", reply: str = "", language: s
 
 
 def get_status():
-    return {**engine.status(), "workerReady": True, "localStandalone": True}
+    state = engine.status()
+    return {**state, "workerReady": True, "voiceReady": bool(state["referenceReady"]),
+            "localStandalone": True, "inferenceBusy": resource_limits.busy(),
+            "inferencePolicy": "single-turn-cpu"}
 
 
 def receive_sample(data: AudioUpload):
@@ -121,30 +142,60 @@ def remove_sample(mode: str = "friend"):
     return {"removed": engine.delete_reference(mode), "mode": mode, "referenceReady": engine.status()["referenceReady"]}
 
 
+def run_exclusive(work):
+    # Acquire before any expensive STT/LLM/TTS operation. No waiting request
+    # queue: FastAPI's threadpool must not accumulate heavyweight jobs.
+    try:
+        with resource_limits.reserve_inference(model_loaded=engine.status()["modelLoaded"]):
+            return work()
+    except resource_limits.VoiceBusy as exc:
+        raise HTTPException(status_code=429, detail=str(exc), headers={"Retry-After": "3"}) from None
+    except resource_limits.VoiceMemoryLow as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from None
+
+
 def handle_speak(data: SpeechRequest):
-    wave = safely(lambda: engine.synthesize(data.text, data.language, data.mode))
-    return wrap_audio(wave, language=data.language)
+    def work():
+        wave = safely(lambda: engine.synthesize(data.text, data.language, data.mode))
+        return wrap_audio(wave, language=data.language)
+    return run_exclusive(work)
 
 
 def handle_chat(data: ChatRequest):
     if not engine.status()["referenceReady"]:
         raise HTTPException(status_code=409, detail="Upload a voice reference clip first.")
-    answer = safely(lambda: engine.reply_to(data.text, mode=data.mode, language=data.language))
-    wav = safely(lambda: engine.synthesize(answer, data.language, data.mode))
-    return wrap_audio(wav, transcript=data.text, reply=answer, language=data.language)
+
+    def work():
+        answer = safely(lambda: engine.reply_to(data.text, mode=data.mode, language=data.language))
+        # Memory can change when Ollama runs. Recheck before voice generation.
+        safely_memory_check()
+        wav = safely(lambda: engine.synthesize(answer, data.language, data.mode))
+        return wrap_audio(wav, transcript=data.text, reply=answer, language=data.language)
+    return run_exclusive(work)
+
+
+def safely_memory_check():
+    try:
+        resource_limits.require_memory(model_loaded=engine.status()["modelLoaded"])
+    except resource_limits.VoiceMemoryLow as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from None
 
 
 def handle_turn(data: VoiceTurnRequest):
     if not engine.status()["referenceReady"]:
         raise HTTPException(status_code=409, detail="Upload a voice reference clip first.")
-    audio = read_audio(data.audio_base64)
-    transcript, detected = safely(lambda: engine.transcribe(audio))
-    if not transcript:
-        raise HTTPException(status_code=422, detail="Could not hear clear words. Try speaking again.")
-    lang = "hi" if detected == "hi" else "en"
-    reply = safely(lambda: engine.reply_to(transcript, mode=data.mode, language=lang))
-    wav = safely(lambda: engine.synthesize(reply, lang, data.mode))
-    return wrap_audio(wav, transcript=transcript, reply=reply, language=lang)
+
+    def work():
+        audio = read_audio(data.audio_base64)
+        transcript, detected = safely(lambda: engine.transcribe(audio))
+        if not transcript:
+            raise HTTPException(status_code=422, detail="Could not hear clear words. Try speaking again.")
+        lang = "hi" if detected == "hi" else "en"
+        answer = safely(lambda: engine.reply_to(transcript, mode=data.mode, language=lang))
+        safely_memory_check()
+        wav = safely(lambda: engine.synthesize(answer, lang, data.mode))
+        return wrap_audio(wav, transcript=transcript, reply=answer, language=lang)
+    return run_exclusive(work)
 
 
 # Protected service-to-service routes. Never expose to anonymous public traffic.
