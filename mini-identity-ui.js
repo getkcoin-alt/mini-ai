@@ -45,7 +45,7 @@ export function installMiniAccountUI({ onVerified, onState, getProfile, onProfil
       await sendEmailMiniOtp(address);
       wrap.classList.remove('hidden');
       $('#email-action').textContent = 'Verify email code ↗';
-      feedback('Check your inbox for the actual verification code.');
+      feedback('Check your inbox. Use the actual email code, or open the sign-in link if one was sent.');
     } else {
       const verified = await verifyEmailMiniOtp(address, $('#email-code').value);
       user = verified; onState(user); onVerified(user);
