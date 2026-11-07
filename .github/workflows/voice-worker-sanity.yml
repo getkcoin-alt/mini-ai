@@ -24,6 +24,16 @@ jobs:
         run: python -m compileall -q services/voice_worker
       - name: Check CPU and local startup shell scripts
         run: bash -n services/voice_worker/setup_cpu_ubuntu.sh services/voice_worker/start-local.sh services/voice_worker/linux_preflight.sh
+      - name: Check benchmark imports in both direct and module modes
+        run: |
+          python - <<'PY'
+          import runpy, sys, types
+          # This smoke test intentionally avoids installing large AI packages.
+          sys.modules["httpx"] = types.ModuleType("httpx")
+          runpy.run_path("services/voice_worker/benchmark_cpu.py", run_name="import_probe")
+          runpy.run_module("services.voice_worker.benchmark_cpu", run_name="import_probe")
+          print("Benchmark import-path smoke test: PASS")
+          PY
       - name: Test private dual-style audio reference importer
         run: |
           python - <<'PY'
