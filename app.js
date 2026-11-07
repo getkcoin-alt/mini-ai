@@ -16,7 +16,7 @@
     { key: 'boundaries', question: 'Is there anything you want me to respect?', help: "I can listen, challenge, or give you space. You're in charge.", placeholder: '“Be honest with me, but don’t push when I say stop.”', kind: 'text' }
   ];
   const defaults = { name: '', miniName: 'Mini', relationship: 'both', tone: 'balanced', focus: '', boundaries: '' };
-  const state = { profile: { ...defaults }, completed: {}, hasTalked: false, step: 0, auth: 'google', page: 'today', mode: 'friend', isListening: false, recognizer: null, autoSpeak: true, voiceOutput: true, captions: true, lastReply: '', previewGuest: true, demoExploration: false };
+  const state = { profile: { ...defaults }, completed: {}, hasTalked: false, step: 0, auth: 'google', page: 'today', mode: 'friend', isListening: false, recognizer: null, autoSpeak: true, voiceOutput: true, captions: true, lastReply: '', previewGuest: true, demoExploration: false, voiceStatus: { authReady: false, ownerSignedIn: false, ttsReady: false, agentReady: false }, chosenVoiceId: '', voiceAbort: null, voiceAudio: null, voiceAudioUrl: null, liveConversation: null, liveConnecting: false };
 
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => Array.from(document.querySelectorAll(selector));
@@ -121,7 +121,7 @@
     toast('Preview code accepted. Identity is NOT verified.');
     startSetup();
   }
-  function speak(message) {
+  function browserSpeak(message) {
     if (!state.voiceOutput || !('speechSynthesis' in window) || !message) return false;
     try {
       window.speechSynthesis.cancel();
@@ -139,6 +139,7 @@
     } catch (_) { return false; }
   }
   function listen(target) {
+    if (state.liveConversation) return toast('End the live ElevenLabs call before using the browser microphone.');
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
       toast('Live speech recognition is not supported in this browser. You can still type.');
@@ -153,7 +154,7 @@
       return;
     }
     try {
-      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      stopVoicePlayback();
       const recognition = new SpeechRecognition();
       state.recognizer = recognition;
       recognition.lang = navigator.language || 'en-IN';
@@ -195,7 +196,7 @@
     $('#talk-button')?.classList.toggle('listening', active);
     text('#talk-icon', active ? '■' : '🎙');
     text('#voice-state', active ? 'Listening to you...' : 'Ready when you are.');
-    text('#voice-helper', active ? 'Speak naturally. Tap the mic to stop.' : 'Tap the microphone to talk · Browser speech preview');
+    if (!state.liveConversation && !state.liveConnecting) text('#voice-helper', active ? 'Speak naturally. Tap the mic to stop.' : 'Tap the microphone to talk · Browser speech preview');
     text('#setup-voice-info', active ? '🎙 Listening... speak at your own pace.' : '🎙 Microphone support depends on your browser. Typing always works.');
     text('#speak-answer span', active ? 'Stop listening' : 'Speak instead');
   }
@@ -373,7 +374,7 @@
     text('#voice-state', 'Here with you.');
     $('#type-input').value = '';
     save(); refreshHome();
-    speak(reply);
+    void speak(reply);
   }
   function demoExplore() {
     if (!state.profile.name) {
@@ -406,14 +407,14 @@
   $('#hero-preview').addEventListener('click', demoExplore);
   $('#auth-back').addEventListener('click', () => screen('welcome'));
   $$('.auth-tab').forEach((el) => el.addEventListener('click', () => selectAuth(el.dataset.authMethod)));
-  $('#google-signin').addEventListener('click', () => toast('Google OAuth is not connected. Choose “Continue in demo mode” to explore.'));
+  $('#google-signin').addEventListener('click', () => toast('Google login requires the OAuth client configured in Vercel. Continue in demo mode until then.'));
   $('#auth-email').addEventListener('submit', emailFlow);
   $('#auth-whatsapp').addEventListener('submit', whatsappFlow);
   $('#continue-demo').addEventListener('click', startSetup);
   $('#setup-back').addEventListener('click', () => { if (state.step === 0) screen('auth'); else { state.step--; renderQuestion(false); } });
   $('#skip-question').addEventListener('click', () => saveStep(true));
   $('#next-question').addEventListener('click', () => saveStep(false));
-  $('#listen-question').addEventListener('click', () => speak(questions[state.step].question) || toast('Speech synthesis is unavailable in this browser.'));
+  $('#listen-question').addEventListener('click', () => { void speak(questions[state.step].question); });
   $('#speak-answer').addEventListener('click', () => listen('setup'));
   $('#question-answer').addEventListener('input', updateSummary);
   $$('[data-app-page]').forEach((el) => el.addEventListener('click', () => setPage(el.dataset.appPage)));
@@ -422,23 +423,28 @@
   $$('.mode-switch [data-mode]').forEach((el) => el.addEventListener('click', () => {
     state.mode = el.dataset.mode;
     refreshHome();
+    if (state.liveConversation) state.liveConversation.sendContextualUpdate('The user selected ' + state.mode + ' personality. Respond accordingly within your configured rules.');
     toast(state.mode === 'mentor' ? 'Mentor mode · calm and practical' : 'Friend mode · warm and playful');
   }));
-  $('#talk-button').addEventListener('click', () => listen('home'));
-  $('#replay-reply').addEventListener('click', () => speak(state.lastReply || 'Hey, I’m Mini. I’m right here. Tell me what’s on your mind.') || toast('Speech output is unavailable.'));
-  $('#stop-speaking').addEventListener('click', () => { if (state.recognizer) state.recognizer.abort(); if ('speechSynthesis' in window) window.speechSynthesis.cancel(); text('#voice-state', 'Ready when you are.'); });
+  $('#talk-button').addEventListener('click', () => { if (state.voiceStatus.ownerSignedIn && state.voiceStatus.agentReady) void toggleLiveConversation(); else listen('home'); });
+  $('#replay-reply').addEventListener('click', () => { if (state.liveConversation) return toast('End the live voice call before replaying audio.'); void speak(state.lastReply || 'Hey, I’m Mini. I’m right here. Tell me what’s on your mind.'); });
+  $('#stop-speaking').addEventListener('click', () => { if (state.liveConversation) void toggleLiveConversation(); if (state.recognizer) state.recognizer.abort(); stopVoicePlayback(); text('#voice-state', 'Ready when you are.'); });
   $('#type-toggle').addEventListener('click', () => {
     const form = $('#type-form'); form.classList.toggle('hidden');
     text('#type-toggle span', form.classList.contains('hidden') ? 'Open text input ↓' : 'Close text input ↑');
     if (!form.classList.contains('hidden')) $('#type-input').focus();
   });
-  $('#type-form').addEventListener('submit', (event) => { event.preventDefault(); handleMessage($('#type-input').value); });
+  $('#type-form').addEventListener('submit', (event) => { event.preventDefault(); const typed = $('#type-input').value.trim(); if (!typed) return; if (state.liveConversation) { state.liveConversation.sendUserMessage(typed); text('#user-transcript', typed); $('#type-input').value = ''; state.hasTalked = true; save(); refreshHome(); } else handleMessage(typed); });
   $('#toggle-captions').addEventListener('click', () => { state.captions = !state.captions; refreshHome(); });
   $('#show-captions').addEventListener('change', (event) => { state.captions = event.target.checked; refreshHome(); });
   $('#voice-output').addEventListener('change', (event) => {
     state.voiceOutput = event.target.checked;
-    if (!state.voiceOutput && 'speechSynthesis' in window) window.speechSynthesis.cancel();
+    if (!state.voiceOutput) stopVoicePlayback();
   });
+  $('#voice-signin').addEventListener('click', begin);
+  $('#voice-logout').addEventListener('click', () => void logoutOwner());
+  $('#voice-test').addEventListener('click', () => void speak('Hey, I’m Mini. This is what I sound like when we talk.'));
+  $('#eleven-voice-list').addEventListener('change', (event) => { state.chosenVoiceId = event.target.value; try { localStorage.setItem('mini-ai-voice-preference', state.chosenVoiceId); } catch (_) {} toast('Voice selected for spoken replies.'); });
   $('#clear-local').addEventListener('click', resetData);
   $('#sidebar-reset').addEventListener('click', resetData);
 
@@ -448,7 +454,9 @@
     $('#header-start').textContent = 'Resume preview ↗';
     $('#header-start').addEventListener('click', () => toast('This is a local demo profile, not a signed-in account.'));
   }
+  try { state.chosenVoiceId = localStorage.getItem('mini-ai-voice-preference') || ''; } catch (_) {}
   selectAuth('google');
+  void refreshVoiceStatus();
   refreshProfilePreview();
   refreshHome();
 })();
