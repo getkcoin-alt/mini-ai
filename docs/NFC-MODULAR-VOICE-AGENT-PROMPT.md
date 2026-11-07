@@ -2,6 +2,8 @@
 ## Mission: NFC modular 100% local voice inference, authenticated streaming frontend, custom Mini voices
 **Read every instruction. This is an IMPLEMENT + TEST task, not merely a proposal.**
 
+**Mandatory GO/NO-GO acceptance contract:** [PHASE-1C-MEASURABLE-ACCEPTANCE-CRITERIA.md](PHASE-1C-MEASURABLE-ACCEPTANCE-CRITERIA.md). All G0 checks are hard blockers; G1 gates invited MVP, G2 gates public beta, and G3 is a stretch target. Attach actual measurements and do not claim PASS from planned tests.
+
 **Repository:** \`https://github.com/getkcoin-alt/mini-ai\`  
 **Frontend architecture:** \`docs/MINI-MODULAR-VOICE-ARCHITECTURE.md\` on \`feature/mini-modular-realtime-frontend\`  
 **Do not touch:** \`getkcoin-alt/itsmay\`, other GitHub projects, other NFC VMs, host virtualization settings, or public network ports without explicit need and authorization.
