@@ -58,6 +58,16 @@ The competitive advantage is **trustworthy continuity + personal relevance + dep
 
 See `docs/VOICE-INTEGRATION.md`. Voice cloning itself is **not** a finished live production feature until the sample, inference host and end-to-end tests are complete.
 
+### New inference-host evaluation — nfc (2026-11-07)
+
+- [x] Document the additional Ubuntu 24.04 **nfc** host (20 physical Xeon Gold 6138 cores / 40 threads, 128 GB total RAM, ~60 GB available, ~732 GB SSD free) and prepare a non-disruptive CPU benchmark plan.
+- [ ] Confirm actual NVIDIA/other GPU availability, CPU quotas, NUMA and active production workloads with a **read-only** preflight. Do not infer GPU presence from CPU/RAM specifications.
+- [ ] Benchmark fixed-text Chatterbox Nano voice synthesis at 8/12/16 CPU threads and compare with measured scrizaone performance.
+- [ ] If safe and faster, migrate only the private inference backend to nfc; leave the Vercel frontend and other repositories unchanged.
+- [ ] Wire the authenticated HTTPS gateway to the selected backend only after memory, latency and security checks pass.
+
+Runbook: [nfc server plan](PHASE-1B-NFC-SERVER.md). The current working inference remains on **scrizaone** until nfc testing proves otherwise.
+
 ## Phase 1B — first **real** AI MVP (implement in this order)
 
 - [ ] **1. Secure identity gateway:** Google OIDC using auth-code/PKCE, email magic link or server-verified OTP, and WhatsApp OTP via Scriwo server-to-server flow with abuse/rate limits, expiry, resend rules, consent and verified phone binding.
