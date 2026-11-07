@@ -23,7 +23,7 @@ on:
       - '.github/workflows/mini-auth-verify.yml'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   validate:
@@ -50,18 +50,3 @@ jobs:
         run: npm run build
       - name: Check compiled application
         run: test -s dist/index.html && test -s dist/assets/*.js
-      # This one-time trusted feature-branch operation makes installs reproducible.
-      # The lockfile-only commit does not match this workflow's path filters.
-      - name: Commit pinned dependency lock after successful tests (feature branch only)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/feature/phase1b-supabase-multiuser'
-        run: |
-          test -s package-lock.json
-          if git ls-files --error-unmatch package-lock.json >/dev/null 2>&1; then
-            echo "Lockfile already tracked; no write needed."
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add package-lock.json
-            git commit -m "build: pin exact Supabase SDK transitive dependency tree"
-            git push origin HEAD:feature/phase1b-supabase-multiuser
-          fi
