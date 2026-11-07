@@ -22,7 +22,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import engine, resource_limits
+from . import engine, memory, resource_limits
 
 logger = logging.getLogger("mini.voice")
 
@@ -59,6 +59,11 @@ class SpeechRequest(BaseModel):
 
 class ChatRequest(SpeechRequest):
     mode: str = Field(default="friend", pattern="^(friend|mentor)$")
+
+
+class ProfileSaveRequest(BaseModel):
+    profile: dict[str, str]
+    consent: bool = False
 
 
 class VoiceTurnRequest(BaseModel):
@@ -166,7 +171,8 @@ def handle_chat(data: ChatRequest):
         raise HTTPException(status_code=409, detail="Upload a voice reference clip first.")
 
     def work():
-        answer = safely(lambda: engine.reply_to(data.text, mode=data.mode, language=data.language))
+        answer = safely(lambda: engine.reply_to(data.text, mode=data.mode, language=data.language,
+                                                 profile=memory.get_profile()["profile"]))
         # Memory can change when Ollama runs. Recheck before voice generation.
         safely_memory_check()
         wav = safely(lambda: engine.synthesize(answer, data.language, data.mode))
@@ -191,11 +197,47 @@ def handle_turn(data: VoiceTurnRequest):
         if not transcript:
             raise HTTPException(status_code=422, detail="Could not hear clear words. Try speaking again.")
         lang = "hi" if detected == "hi" else "en"
-        answer = safely(lambda: engine.reply_to(transcript, mode=data.mode, language=lang))
+        answer = safely(lambda: engine.reply_to(transcript, mode=data.mode, language=lang,
+                                                 profile=memory.get_profile()["profile"]))
         safely_memory_check()
         wav = safely(lambda: engine.synthesize(answer, lang, data.mode))
         return wrap_audio(wav, transcript=transcript, reply=answer, language=lang)
     return run_exclusive(work)
+
+
+def save_profile(data: ProfileSaveRequest):
+    return safely(lambda: memory.save_profile(data.profile, data.consent))
+
+
+# Profile data is kept by explicit consent, and never includes audio/transcripts.
+@app.get("/v1/profile", dependencies=[Depends(worker_auth)])
+def protected_profile():
+    return safely(memory.get_profile)
+
+
+@app.post("/v1/profile", dependencies=[Depends(worker_auth)])
+def protected_profile_save(data: ProfileSaveRequest):
+    return save_profile(data)
+
+
+@app.delete("/v1/profile", dependencies=[Depends(worker_auth)])
+def protected_profile_delete():
+    return safely(memory.delete_profile)
+
+
+@app.get("/api/voice/profile", dependencies=[Depends(local_auth)])
+def local_profile():
+    return safely(memory.get_profile)
+
+
+@app.post("/api/voice/profile", dependencies=[Depends(local_auth)])
+def local_profile_save(data: ProfileSaveRequest):
+    return save_profile(data)
+
+
+@app.delete("/api/voice/profile", dependencies=[Depends(local_auth)])
+def local_profile_delete():
+    return safely(memory.delete_profile)
 
 
 # Protected service-to-service routes. Never expose to anonymous public traffic.
