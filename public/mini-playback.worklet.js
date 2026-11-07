@@ -46,7 +46,7 @@ class MiniPlaybackProcessor extends AudioWorkletProcessor {
     const out = outputs[0]?.[0];
     if (!out) return true;
     out.fill(0);
-    if (!this.started && this.count >= this.sourceRate * 0.06) {
+    if (!this.started && (this.count >= this.sourceRate * 0.06 || (this.receivedEnd && this.count > 0))) {
       this.started = true;
       this.port.postMessage({type:'playback.started'});
     }
