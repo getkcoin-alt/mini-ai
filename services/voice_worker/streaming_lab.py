@@ -108,10 +108,11 @@ def stream_reply(text: str, *, mode: str = "friend", cancel: threading.Event | N
             "num_thread": int(os.getenv("MINI_STREAM_LAB_THREADS", "4"))
         }
     }
+    url = _base_url()  # Validate transport BEFORE opening a client.
     buffer = ClauseBuffer()
     total = 0
     with httpx.Client(timeout=90, trust_env=False) as client:
-        with client.stream("POST", _base_url() + "/api/chat", json=payload) as response:
+        with client.stream("POST", url + "/api/chat", json=payload) as response:
             response.raise_for_status()
             for line in response.iter_lines():
                 if cancel is not None and cancel.is_set():
