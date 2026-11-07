@@ -1,4 +1,5 @@
 import { createVoiceRequestGate, voiceResponseError } from './voice-request-gate.js';
+import { startMiniLiveTurn } from './mini-live-browser.js';
 
 /* Mini AI — frontend-only interactive prototype.
  * Important: browser speech APIs and scripted demo responses are NOT an AI backend,
@@ -8,6 +9,9 @@ import { createVoiceRequestGate, voiceResponseError } from './voice-request-gate
   'use strict';
 
   const voiceGate = createVoiceRequestGate();
+  let liveSession = null;
+  let livePending = false;
+  let liveRecording = false;
   const STORAGE_KEY = 'mini-ai-design-preview-v1';
   const DEMO_CODE = '123456';
   const questions = [
@@ -653,6 +657,9 @@ import { createVoiceRequestGate, voiceResponseError } from './voice-request-gate
 
   function updateVoiceUi() {
     const v = state.voiceStatus;
+    const liveButton = $('#mini-live-talk');
+    if (liveButton) liveButton.hidden = !(v.streamingPreviewReady && v.localStandalone && v.referenceReady);
+    if (liveButton && !liveSession && !livePending) liveButton.disabled = voiceGate.isBusy() || Boolean(state.recorder) || state.sendingVoice;
     const ownerAccess = Boolean(v.ownerSignedIn || v.localStandalone);
     const status = canUseWorker()
       ? 'FREE LOCAL SPEECH · CHATTERBOX + WHISPER + OLLAMA'
@@ -697,7 +704,8 @@ import { createVoiceRequestGate, voiceResponseError } from './voice-request-gate
         referenceReady: Boolean(data.referenceReady),
         referenceModes: data.referenceModes && typeof data.referenceModes === 'object' ? data.referenceModes : {},
         localStandalone: Boolean(data.localStandalone),
-        voiceReady: Boolean(data.voiceReady ?? (data.workerReady && data.referenceReady))
+        voiceReady: Boolean(data.voiceReady ?? (data.workerReady && data.referenceReady)),
+        streamingPreviewReady: Boolean(data.streamingPreviewReady)
       };
       updateVoiceUi();
       if (canSyncProfile()) void readMemoryStatus();
@@ -811,9 +819,79 @@ import { createVoiceRequestGate, voiceResponseError } from './voice-request-gate
     refreshHome();
      toast(state.mode === 'mentor' ? 'Mentor mode · calm and practical' : 'Friend mode · warm and playful');
   }));
+  const liveButton = document.createElement('button');
+  liveButton.id = 'mini-live-talk';
+  liveButton.type = 'button';
+  liveButton.className = 'button button-soft';
+  liveButton.textContent = 'Try live phrases (private test)';
+  liveButton.hidden = true;
+  $('#talk-button').insertAdjacentElement('afterend', liveButton);
+  liveButton.addEventListener('click', async () => {
+    if (livePending) return;
+    if (liveSession && liveRecording) {
+      liveRecording = false;
+      liveButton.disabled = true;
+      liveButton.textContent = 'Mini is thinking…';
+      liveSession.finish();
+      return;
+    }
+    if (liveSession || state.sendingVoice || voiceGate.isBusy() || !state.voiceStatus.streamingPreviewReady)
+      return toast('Mini is finishing another voice turn.');
+    livePending = true;
+    state.sendingVoice = true;
+    liveButton.disabled = true;
+    state.lastReply = '';
+    updateVoiceUi();
+    try {
+      liveSession = await startMiniLiveTurn({
+        mode: state.mode,
+        onEvent: item => {
+          if (item.type === 'recording') {
+            liveRecording = true;
+            liveButton.disabled = false;
+            liveButton.textContent = 'Finish speaking ✓';
+            text('#voice-state', 'Listening through your private Mini stream…');
+          } else if (item.type === 'waiting' || item.type === 'stage') {
+            text('#voice-state', item.message || ('Mini is ' + item.name + '…'));
+          } else if (item.type === 'transcript') {
+            text('#voice-state', 'Heard: ' + String(item.text || '').slice(0,150));
+          } else if (item.type === 'token') {
+            state.lastReply += String(item.text || '');
+            if (state.captions) refreshHome();
+          } else if (item.type === 'audio') {
+            text('#voice-state', 'Playing your authorized Mini voice, phrase ' + item.part);
+          } else if (item.type === 'error') {
+            toast(item.message || 'Mini live phrase generation failed.');
+          } else if (item.type === 'cancelled') {
+            text('#voice-state', 'Stopped. Mini is cleaning up its current model turn.');
+          }
+        },
+        onFinish: () => {
+          liveSession = null;
+          liveRecording = false;
+          livePending = false;
+          state.sendingVoice = false;
+          liveButton.disabled = false;
+          liveButton.textContent = 'Try live phrases (private test)';
+          text('#voice-state', 'Private live phrase turn finished.');
+          updateVoiceUi();
+        }
+      });
+    } catch(error) {
+      liveSession = null;
+      liveRecording = false;
+      state.sendingVoice = false;
+      toast(String(error.message).slice(0,150));
+      liveButton.textContent = 'Try live phrases (private test)';
+    } finally {
+      livePending = false;
+      updateVoiceUi();
+    }
+  });
   $('#talk-button').addEventListener('click', () => { if (state.recorder || canUseWorker()) void toggleVoiceRecording(); else listen('home'); });
   $('#replay-reply').addEventListener('click', () => { if (state.lastAudioBase64 && canUseWorker()) void playLocalAudio(state.lastAudioBase64); else void speak(state.lastReply || 'Hey, I’m Mini. I’m right here. Tell me what’s on your mind.'); });
   $('#stop-speaking').addEventListener('click', () => {
+    if (liveSession) liveSession.cancel();
     if (state.recorder) {
       state.discardNextRecording = true;
       state.recorder.stop();
