@@ -215,6 +215,9 @@ def reply_to(text: str, *, mode: str, language: str = "en") -> str:
             response = client.post(url + "/api/chat", json={
                 "model": os.environ.get("MINI_OLLAMA_MODEL", "llama3.2:1b"),
                 "stream": False,
+                # On this shared 16-GiB VPS, don't keep a 1B model resident
+                # while Chatterbox loads several GiB of model weights.
+                "keep_alive": os.environ.get("MINI_OLLAMA_KEEP_ALIVE", "0"),
                 "messages": [
                     {"role": "system", "content": system},
                     {"role": "user", "content": text[:1200]},
