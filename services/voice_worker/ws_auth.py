@@ -53,3 +53,14 @@ def local_dev_identity(access_token: str | None, allow_local_dev: bool) -> dict 
             or not hmac.compare_digest(expected.encode(), access_token.encode())):
         return None
     return {"id": "local-dev-owner", "role": "local-dev"}
+
+
+def browser_origin_refused(path: str, origin: str | None) -> bool:
+    """CORS policy for the public worker domain: server-to-server only.
+
+    /v1/* is called by the Vercel gateway (no Origin header). Browsers always
+    send Origin on cross-origin fetch and on every WebSocket handshake, so any
+    /v1 request carrying one is refused. No Access-Control-* headers are ever
+    emitted, so browsers also block reading responses.
+    """
+    return path.startswith("/v1/") and bool(origin)

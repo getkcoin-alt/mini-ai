@@ -43,6 +43,15 @@ app = FastAPI(title="Mini AI Private Voice Worker", docs_url=None, redoc_url=Non
 MAX_BASE64_LENGTH = 4_100_000
 
 
+@app.middleware("http")
+async def refuse_browser_origins(request: Request, call_next):
+    # Public worker domain is server-to-server only (see ws_auth). Runs before
+    # body parsing and token checks, so preflights and browser calls get 403.
+    if ws_auth.browser_origin_refused(request.url.path, request.headers.get("origin")):
+        return JSONResponse(status_code=403, content={"detail": "Browser origins are not allowed on /v1."})
+    return await call_next(request)
+
+
 class AudioUpload(BaseModel):
     audio_base64: str = Field(min_length=1, max_length=MAX_BASE64_LENGTH)
     mime: str = Field(default="audio/wav", max_length=70)
@@ -310,7 +319,8 @@ async def _run_realtime(websocket: WebSocket, *, allow_local_dev: bool):
 # the server reject the upgrade (HTTP 403).
 @app.websocket("/v1/realtime")
 async def protected_realtime_ws(websocket: WebSocket):
-    if not ws_auth.worker_token_ok(websocket.headers.get("x-mini-worker-token")):
+    if (ws_auth.browser_origin_refused(websocket.url.path, websocket.headers.get("origin"))
+            or not ws_auth.worker_token_ok(websocket.headers.get("x-mini-worker-token"))):
         await websocket.close(code=1008, reason="Worker authentication required")
         return
     await _run_realtime(websocket, allow_local_dev=False)
