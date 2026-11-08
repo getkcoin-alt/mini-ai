@@ -802,13 +802,14 @@ import { createMiniRealtimeUI } from './mini-realtime-ui.js';
   // Navigation
   ['#header-start', '#hero-start', '#footer-start'].forEach((sel) => $(sel).addEventListener('click', begin));
   $('#brand-home').addEventListener('click', (event) => { event.preventDefault(); screen('welcome'); });
-  $('#hero-preview').addEventListener('click', demoExplore);
+  // Demo mode is off in production: remove both demo entry points.
+  $('#hero-preview')?.remove();
   $('#auth-back').addEventListener('click', () => screen('welcome'));
   $$('.auth-tab').forEach((el) => el.addEventListener('click', () => selectAuth(el.dataset.authMethod)));
   $('#google-signin').addEventListener('click', () => toast('Google login requires the OAuth client configured in Vercel. Continue in demo mode until then.'));
   $('#auth-email').addEventListener('submit', emailFlow);
   $('#auth-whatsapp').addEventListener('submit', whatsappFlow);
-  $('#continue-demo').addEventListener('click', () => { load(); startSetup(); });
+  $('#continue-demo')?.remove();
   $('#setup-back').addEventListener('click', () => { if (state.step === 0) screen('auth'); else { state.step--; renderQuestion(false); } });
   $('#skip-question').addEventListener('click', () => saveStep(true));
   $('#next-question').addEventListener('click', () => saveStep(false));
@@ -884,7 +885,11 @@ import { createMiniRealtimeUI } from './mini-realtime-ui.js';
         refreshProfilePreview();
         refreshHome();
       }
+      const newlySignedIn = Boolean(user?.id) && !state.supaUser?.id;
       state.supaUser = user;
+      // After Google/email sign-in (including the OAuth redirect back), go
+      // straight to onboarding step 1 unless the saved profile already has a name.
+      if (newlySignedIn && !state.completed.name) startSetup();
       void miniLive.setUser(user);
       updateMemoryUi();
     },
