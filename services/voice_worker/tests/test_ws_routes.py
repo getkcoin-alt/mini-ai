@@ -75,6 +75,22 @@ class RealtimeRouteAuthTests(unittest.TestCase):
             with client.websocket_connect("/v1/realtime", headers={**LOOPBACK_HOST, "x-mini-worker-token": TOKEN}) as ws:
                 self.assertEqual(ws.receive_json(), {"accepted": True, "allow_local_dev": False})
 
+    def test_v1_refuses_browser_origin_even_with_token(self):
+        with patch.dict(os.environ, {"MINI_WORKER_TOKEN": TOKEN}):
+            client = self._client()
+            self._refused(client, "/v1/realtime", {"x-mini-worker-token": TOKEN,
+                                                   "origin": "https://mini-ai-gitkcoin.vercel.app"})
+            hdr = {**LOOPBACK_HOST, "x-mini-worker-token": TOKEN}
+            r = client.get("/v1/status", headers={**hdr, "origin": "https://mini-ai-gitkcoin.vercel.app"})
+            self.assertEqual(r.status_code, 403)
+            self.assertNotIn("access-control-allow-origin", r.headers)
+            pre = client.options("/v1/turn", headers={"origin": "https://evil.example",
+                                                      "access-control-request-method": "POST"})
+            self.assertEqual(pre.status_code, 403)
+            self.assertNotIn("access-control-allow-origin", pre.headers)
+            # Unauthenticated server-to-server call: token check still applies.
+            self.assertEqual(client.get("/v1/status").status_code, 401)
+
     def test_v1_realtime_refused_when_worker_token_unset(self):
         with patch.dict(os.environ, {"MINI_WORKER_TOKEN": ""}):
             self._refused(self._client(), "/v1/realtime", {"x-mini-worker-token": ""})

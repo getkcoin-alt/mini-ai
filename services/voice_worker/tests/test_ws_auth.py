@@ -53,5 +53,17 @@ class DevIdentityTests(unittest.TestCase):
             self.assertEqual(ws_auth.local_dev_identity(secret, True)["id"], "local-dev-owner")
 
 
+class BrowserOriginTests(unittest.TestCase):
+    def test_v1_refuses_any_origin(self):
+        for origin in ("https://mini-ai-gitkcoin.vercel.app", "http://localhost:3000", "null"):
+            self.assertTrue(ws_auth.browser_origin_refused("/v1/status", origin), origin)
+        self.assertFalse(ws_auth.browser_origin_refused("/v1/status", None))
+        self.assertFalse(ws_auth.browser_origin_refused("/v1/status", ""))
+
+    def test_non_v1_paths_unaffected(self):
+        self.assertFalse(ws_auth.browser_origin_refused("/health", "https://x.example"))
+        self.assertFalse(ws_auth.browser_origin_refused("/api/voice/status", "http://127.0.0.1:8765"))
+
+
 if __name__ == "__main__":
     unittest.main()
