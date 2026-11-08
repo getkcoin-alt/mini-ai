@@ -25,7 +25,7 @@ import numpy as np
 import torch
 from fastapi import WebSocket, WebSocketDisconnect
 
-from . import engine, memory, resource_limits
+from . import engine, memory, resource_limits, ws_auth
 
 logger = logging.getLogger("mini.realtime")
 
@@ -59,14 +59,6 @@ async def verify_supabase_token(access_token: str) -> dict | None:
     """Validate Supabase access token via Supabase Auth API."""
     if not access_token or not isinstance(access_token, str):
         return None
-    # For local loopback development and automated offline tests:
-    if access_token == "local-dev-bypass" or access_token.startswith("test-token-"):
-        return {
-            "id": "01f4fa71-e66c-4302-b9fa-c4862eb94ea1",
-            "email": "owner@scriza.in",
-            "role": "authenticated",
-        }
-
     supabase_url = os.environ.get(
         "MINI_SUPABASE_URL", "https://gkdaxtnlwojggdqitsex.supabase.co"
     ).rstrip("/")
@@ -148,8 +140,9 @@ class SileroVADDetector:
 
 
 class MiniRealtimeSession:
-    def __init__(self, websocket: WebSocket):
+    def __init__(self, websocket: WebSocket, allow_local_dev_token: bool = False):
         self.ws = websocket
+        self.allow_local_dev_token = allow_local_dev_token
         self.session_id = f"sess_{uuid.uuid4().hex[:12]}"
         self.user_id: str | None = None
         self.mode = "friend"
@@ -219,7 +212,8 @@ class MiniRealtimeSession:
                 return
 
             access_token = event.get("access_token")
-            user = await verify_supabase_token(access_token)
+            user = (ws_auth.local_dev_identity(access_token, self.allow_local_dev_token)
+                    or await verify_supabase_token(access_token))
             if not user or not user.get("id"):
                 await self.send_json({"type": "session.error", "message": "Authentication failed: invalid or expired token"})
                 await self.ws.close(code=4401, reason="Unauthorized")

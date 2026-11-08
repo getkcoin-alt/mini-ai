@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import struct
 import sys
 import time
@@ -26,6 +27,9 @@ except ImportError:
 
 WS_URL = "ws://localhost:8765/api/voice/realtime"
 PROTOCOL = "mini.realtime.v1"
+# Loopback-only test identity. The worker must be started with the same
+# MINI_REALTIME_DEV_TOKEN (32+ random chars); it is refused on /v1/realtime.
+DEV_TOKEN = os.environ.get("MINI_REALTIME_DEV_TOKEN", "")
 
 
 async def test_auth_rejection():
@@ -51,7 +55,7 @@ async def test_full_speech_turn_and_barge_in():
         await ws.send(json.dumps({
             "type": "session.start",
             "protocol": PROTOCOL,
-            "access_token": "test-token-alice",
+            "access_token": DEV_TOKEN,
             "mode": "friend",
             "audio_input": {"format": "pcm16", "channels": 1, "sample_rate": 16000, "frame_ms": 20},
             "audio_output": {"format": "pcm16", "channels": 1, "sample_rate": 24000},
@@ -179,7 +183,10 @@ async def test_full_speech_turn_and_barge_in():
 
 async def main():
     await test_auth_rejection()
-    await test_full_speech_turn_and_barge_in()
+    if len(DEV_TOKEN) < 32:
+        print("SKIP Test 2: set MINI_REALTIME_DEV_TOKEN (32+ chars, same value as the worker) to run a full turn.")
+    else:
+        await test_full_speech_turn_and_barge_in()
     print("\nALL REALTIME WEBSOCKET PIPELINE TESTS PASSED!")
 
 

@@ -164,11 +164,48 @@ class RealtimeProtocolTests(unittest.TestCase):
         res2 = asyncio.run(realtime.verify_supabase_token(None))
         self.assertIsNone(res2)
 
-        # Test bypass token
-        res_test = asyncio.run(realtime.verify_supabase_token("test-token-alice"))
-        self.assertIsNotNone(res_test)
-        self.assertEqual(res_test["id"], "01f4fa71-e66c-4302-b9fa-c4862eb94ea1")
+        # Former hard-coded bypass strings must now go to Supabase and fail.
+        # (CI's httpx stub answers 401; with real httpx, Supabase rejects them.)
+        for token in ("test-token-alice", "local-dev-bypass", "test-token-"):
+            with patch.object(realtime.httpx, "AsyncClient") as client_cls:
+                client = client_cls.return_value.__aenter__.return_value
+                client.get = AsyncMock(return_value=types.SimpleNamespace(status_code=401, json=lambda: {}))
+                self.assertIsNone(asyncio.run(realtime.verify_supabase_token(token)), token)
+                client.get.assert_awaited_once()
 
+    def _session_with_token(self, token, allow_local_dev, dev_env=None):
+        ws = MagicMock()
+        ws.send_text = AsyncMock()
+        ws.close = AsyncMock()
+        session = realtime.MiniRealtimeSession(ws, allow_local_dev_token=allow_local_dev)
+        event = json.dumps({"type": "session.start", "protocol": realtime.MINI_REALTIME_PROTOCOL,
+                            "access_token": token, "mode": "friend"})
+        env = {"MINI_REALTIME_DEV_TOKEN": dev_env} if dev_env is not None else {}
+        with patch.dict("os.environ", env, clear=False), \
+                patch.object(realtime, "verify_supabase_token", AsyncMock(return_value=None)):
+            if dev_env is None:
+                import os
+                os.environ.pop("MINI_REALTIME_DEV_TOKEN", None)
+            asyncio.run(session.handle_text_event(event))
+        return session, ws
+
+    def test_session_rejects_former_bypass_tokens(self):
+        for allow in (False, True):
+            for token in ("test-token-alice", "local-dev-bypass"):
+                session, ws = self._session_with_token(token, allow)
+                self.assertFalse(session.is_ready)
+                ws.close.assert_awaited_once()
+                self.assertEqual(ws.close.await_args.kwargs.get("code"), 4401)
+
+    def test_dev_token_only_on_loopback_route(self):
+        secret = "d" * 40
+        session, _ = self._session_with_token(secret, allow_local_dev=True, dev_env=secret)
+        self.assertTrue(session.is_ready)
+        self.assertEqual(session.user_id, "local-dev-owner")
+        # Same secret on the protected /v1 route is refused.
+        session, ws = self._session_with_token(secret, allow_local_dev=False, dev_env=secret)
+        self.assertFalse(session.is_ready)
+        ws.close.assert_awaited_once()
 
 if __name__ == "__main__":
     unittest.main()
