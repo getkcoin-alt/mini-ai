@@ -6,11 +6,77 @@ and barge-in interruption logic without loading expensive models.
 import asyncio
 import json
 import struct
+import sys
+import types
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import numpy as np
-import torch
+# Ensure test suite runs in lightweight/headless CI environments without heavy AI deps
+try:
+    import numpy as np
+except ImportError:
+    np_mock = types.ModuleType("numpy")
+    class ArrayMock(list):
+        def tobytes(self):
+            return b"".join(int(x).to_bytes(2, "little", signed=True) for x in self)
+        def astype(self, t):
+            return self
+        def __truediv__(self, v):
+            return [x / v for x in self]
+    np_mock.array = lambda arr, dtype=None: ArrayMock(arr)
+    np_mock.int16 = "int16"
+    np_mock.float32 = "float32"
+    np_mock.frombuffer = lambda buf, dtype=None: ArrayMock([0] * (len(buf) // 2))
+    np_mock.concatenate = lambda arrs: ArrayMock([x for a in arrs for x in a])
+    sys.modules["numpy"] = np_mock
+    import numpy as np
+
+try:
+    import torch
+except ImportError:
+    torch_mock = types.ModuleType("torch")
+    class TensorMock:
+        def __init__(self, val):
+            self.val = val
+        def item(self):
+            return float(self.val) if not hasattr(self.val, "__len__") else float(self.val[0])
+    torch_mock.float32 = "float32"
+    torch_mock.tensor = lambda v, dtype=None: TensorMock(v)
+    torch_mock.from_numpy = lambda arr: TensorMock(arr)
+    hub_mock = types.ModuleType("hub")
+    hub_mock.load = lambda *a, **kw: (lambda chunk, sr: TensorMock(0.1), None)
+    torch_mock.hub = hub_mock
+    sys.modules["torch"] = torch_mock
+    import torch
+
+try:
+    import fastapi
+except ImportError:
+    fastapi_mock = types.ModuleType("fastapi")
+    class WebSocketDisconnect(Exception):
+        def __init__(self, code=1000):
+            self.code = code
+    class WebSocket:
+        pass
+    fastapi_mock.WebSocket = WebSocket
+    fastapi_mock.WebSocketDisconnect = WebSocketDisconnect
+    sys.modules["fastapi"] = fastapi_mock
+
+try:
+    import httpx
+except ImportError:
+    httpx_mock = types.ModuleType("httpx")
+    class AsyncClient:
+        def __init__(self, timeout=None):
+            pass
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, *args):
+            pass
+        async def get(self, *args, **kwargs):
+            return types.SimpleNamespace(status_code=401, json=lambda: {})
+    httpx_mock.AsyncClient = AsyncClient
+    sys.modules["httpx"] = httpx_mock
 
 from services.voice_worker import realtime
 
