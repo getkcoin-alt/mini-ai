@@ -21,8 +21,10 @@ except ImportError:
             return b"".join(int(x).to_bytes(2, "little", signed=True) for x in self)
         def astype(self, t):
             return self
+        def tolist(self):
+            return list(self)
         def __truediv__(self, v):
-            return [x / v for x in self]
+            return ArrayMock([x / v for x in self])
     np_mock.array = lambda arr, dtype=None: ArrayMock(arr)
     np_mock.int16 = "int16"
     np_mock.float32 = "float32"
