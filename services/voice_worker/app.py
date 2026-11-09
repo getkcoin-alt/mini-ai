@@ -133,18 +133,15 @@ def get_status():
             "inferencePolicy": "single-turn-cpu"}
 
 
+VOICE_LOCKED_DETAIL = "Mini has one fixed voice. Uploading or removing voice samples is disabled."
+
+
 def receive_sample(data: AudioUpload):
-    if data.consent is not True:
-        raise HTTPException(status_code=400, detail="Confirm that you own the voice or have permission to reproduce it.")
-    audio = read_audio(data.audio_base64)
-    duration = safely(lambda: engine.save_reference(audio, data.mode))
-    return {"saved": True, "mode": data.mode, "durationSeconds": duration, "referenceReady": True, "location": "private-worker-disk"}
+    raise HTTPException(status_code=403, detail=VOICE_LOCKED_DETAIL)
 
 
 def remove_sample(mode: str = "friend"):
-    if mode not in ("friend", "mentor"):
-        raise HTTPException(status_code=400, detail="Invalid voice style")
-    return {"removed": engine.delete_reference(mode), "mode": mode, "referenceReady": engine.status()["referenceReady"]}
+    raise HTTPException(status_code=403, detail=VOICE_LOCKED_DETAIL)
 
 
 def run_exclusive(work):

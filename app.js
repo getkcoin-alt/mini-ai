@@ -132,23 +132,6 @@ import { createMiniRealtimeUI } from './mini-realtime-ui.js';
     toast('Preview code accepted. Identity is NOT verified.');
     startSetup();
   }
-  function browserSpeak(message) {
-    if (!state.voiceOutput || !('speechSynthesis' in window) || !message) return false;
-    try {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(String(message).replace(/[✦♡◎]/g, ''));
-      utterance.rate = .98; utterance.pitch = 1.07; utterance.volume = 1;
-      const voices = window.speechSynthesis.getVoices();
-      const english = voices.find((v) => v.lang && v.lang.toLowerCase().startsWith('en') && /natural|premium|female|samantha|google/i.test(v.name))
-        || voices.find((v) => v.lang && v.lang.toLowerCase().startsWith('en'));
-      if (english) utterance.voice = english;
-      utterance.onstart = () => $('#app-orb')?.classList.add('speaking');
-      utterance.onend = () => $('#app-orb')?.classList.remove('speaking');
-      utterance.onerror = () => $('#app-orb')?.classList.remove('speaking');
-      window.speechSynthesis.speak(utterance);
-      return true;
-    } catch (_) { return false; }
-  }
   function listen(target) {
      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -206,7 +189,7 @@ import { createMiniRealtimeUI } from './mini-realtime-ui.js';
     $('#talk-button')?.classList.toggle('listening', active);
     text('#talk-icon', active ? '■' : '🎙');
     text('#voice-state', active ? 'Listening to you...' : 'Ready when you are.');
-    if (!state.recorder && !state.sendingVoice) text('#voice-helper', active ? 'Speak naturally. Tap the mic to stop.' : 'Tap to talk · Browser speech preview');
+    if (!state.recorder && !state.sendingVoice) text('#voice-helper', active ? 'Speak naturally. Tap the mic to stop.' : 'Tap to talk');
     text('#setup-voice-info', active ? '🎙 Listening... speak at your own pace.' : '🎙 Microphone support depends on your browser. Typing always works.');
     text('#speak-answer span', active ? 'Stop listening' : 'Speak instead');
   }
@@ -408,7 +391,6 @@ import { createMiniRealtimeUI } from './mini-realtime-ui.js';
     state.hasTalked = false;
     state.lastReply = '';
     state.demoExploration = false;
-    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
     screen('welcome');
     toast('Local preview data cleared.');
   }
@@ -424,7 +406,6 @@ import { createMiniRealtimeUI } from './mini-realtime-ui.js';
     if (state.voiceAudio) { try { state.voiceAudio.pause(); state.voiceAudio.src = ''; } catch (_) {} }
     state.voiceAudio = null;
     if (state.voiceAudioUrl) { URL.revokeObjectURL(state.voiceAudioUrl); state.voiceAudioUrl = null; }
-    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
     $('#app-orb')?.classList.remove('speaking');
   }
 
@@ -513,8 +494,8 @@ import { createMiniRealtimeUI } from './mini-realtime-ui.js';
         return false;
       }
     }
-    if (state.supaUser) return false; // Do not simulate a verified user's AI voice.
-    return browserSpeak(message);
+    // Mini speaks only in its one server voice. No browser or OS voices.
+    return false;
   }
 
   function applyVoiceReply(result) {
@@ -664,36 +645,30 @@ import { createMiniRealtimeUI } from './mini-realtime-ui.js';
 
   function updateVoiceUi() {
     const v = state.voiceStatus;
-    const ownerAccess = Boolean(v.ownerSignedIn || v.localStandalone);
     const status = canUseWorker()
       ? 'FREE LOCAL SPEECH · CHATTERBOX + WHISPER + OLLAMA'
-      : v.workerReady ? 'VOICE WORKER READY · ADD A REFERENCE RECORDING'
+      : v.workerReady ? 'VOICE WORKER READY · MINI VOICE NOT INSTALLED'
       : 'BROWSER DEMO · LOCAL MODEL NOT CONNECTED';
     text('#voice-engine-status', status);
-    text('#conversation-source-note', canUseWorker() ? '✳ Local Mini AI voice active: Whisper + Ollama + Chatterbox. This is turn-based, not continuous streaming.' : '✳ Browser demo uses scripted replies. Connect your local AI worker and voice reference for real speech turns.');
+    text('#conversation-source-note', canUseWorker() ? '✳ Local Mini AI voice active: Whisper + Ollama + Chatterbox. This is turn-based, not continuous streaming.' : '✳ Mini’s voice is offline until the private voice worker is connected. You can still type.');
     text('#voice-account-status', v.localStandalone ? 'Private local worker is running on this computer.'
       : !v.authReady ? 'To use this from Vercel, deploy a private voice worker and configure Google owner authentication.'
       : !v.ownerSignedIn ? 'Sign in to access your private voice worker.'
       : !v.workerReady ? 'Owner signed in. Private voice worker is not reachable.'
       : 'Private voice worker is connected.');
-    const modes = v.referenceModes || {};
-    text('#voice-sample-status', 'Best Friend voice: ' + (modes.friend ? 'installed' : 'not installed') + ' · Mentor voice: ' + (modes.mentor ? 'installed' : 'not installed') + '. Upload a recording for each style.');
+    text('#voice-sample-status', v.referenceReady ? 'Mini’s voice is installed on the private worker.' : v.workerReady ? 'Mini’s voice is not installed on the private worker.' : 'Mini’s voice is on the private worker, which is not connected.');
     text('#voice-engine-note', v.workerReady
       ? 'Audio generation runs through the private Chatterbox model, with faster-whisper and local Ollama for complete speech turns. No ElevenLabs API used.'
       : 'Run the Python worker on your computer, or link a securely hosted GPU worker. Mini does not download or export ElevenLabs voice weights.');
     show('#voice-signin', !v.localStandalone && v.authReady && !v.ownerSignedIn);
     show('#voice-logout', !v.localStandalone && v.ownerSignedIn);
-    $('#voice-reference-file').disabled = !(v.workerReady && ownerAccess);
-    $('#voice-rights').disabled = !(v.workerReady && ownerAccess);
-    $('#voice-upload').disabled = !(v.workerReady && ownerAccess);
     $('#voice-test').disabled = !canUseWorker() || voiceGate.isBusy() || state.sendingVoice;
-    $('#voice-delete').disabled = !(v.workerReady && ownerAccess && Boolean((v.referenceModes || {})[$('#voice-style').value]));
     updateMemoryUi();
     if (!state.recorder && !state.sendingVoice) {
       text('#voice-helper', canUseWorker()
-        ? 'Tap to record · Private Whisper → Ollama → your Chatterbox voice'
+        ? 'Tap to record · Private Whisper → Ollama → Mini’s voice'
         : state.supaUser ? 'Secure realtime voice awaiting NFC gateway activation.'
-        : 'Tap to talk · Browser speech preview (not real AI).');
+        : 'Mini’s voice needs the private worker. You can still type.');
     }
   }
 
@@ -707,7 +682,6 @@ import { createMiniRealtimeUI } from './mini-realtime-ui.js';
         ownerSignedIn: Boolean(data.ownerSignedIn),
         workerReady: Boolean(data.workerReady),
         referenceReady: Boolean(data.referenceReady),
-        referenceModes: data.referenceModes && typeof data.referenceModes === 'object' ? data.referenceModes : {},
         localStandalone: Boolean(data.localStandalone),
         voiceReady: Boolean(data.voiceReady ?? (data.workerReady && data.referenceReady))
       };
@@ -759,36 +733,6 @@ import { createMiniRealtimeUI } from './mini-realtime-ui.js';
     };
     script.onerror = () => toast('Google sign-in scripts are blocked in this browser.');
     document.head.append(script);
-  }
-
-  async function uploadVoiceReference() {
-    const file = $('#voice-reference-file').files?.[0];
-    if (!file) return toast('Choose a voice recording first.');
-    if (!$('#voice-rights').checked) return toast('Confirm that you own the voice or have explicit permission to use it.');
-    if (file.size > 3_000_000) return toast('Reference must be 3 MB or less.');
-    if (!state.voiceStatus.workerReady) return toast('Start your local voice worker first.');
-    $('#voice-upload').disabled = true;
-    text('#voice-sample-status', 'Preparing your private voice reference...');
-    try {
-      const result = await voiceRequest('sample', { audio_base64: await toBase64(file), mime: file.type || 'application/octet-stream', consent: true, mode: $('#voice-style').value });
-      toast('Reference saved on your private worker (' + result.durationSeconds + ' seconds).');
-      $('#voice-rights').checked = false;
-      $('#voice-reference-file').value = '';
-      await refreshVoiceStatus();
-    } catch (error) {
-      if (error.name !== 'AbortError') toast('Reference upload failed: ' + error.message);
-      updateVoiceUi();
-    } finally { $('#voice-upload').disabled = !state.voiceStatus.workerReady; }
-  }
-
-  async function removeVoiceReference() {
-    if (!confirm('Delete Mini’s private reference recording from the worker? This cannot be undone.')) return;
-    try {
-      await voiceRequest('sample?mode=' + encodeURIComponent($('#voice-style').value), undefined, 'DELETE');
-      state.lastAudioBase64 = '';
-      await refreshVoiceStatus();
-      toast('Reference recording for ' + $('#voice-style').value + ' removed from the private worker.');
-    } catch (error) { toast('Delete failed: ' + error.message); }
   }
 
   async function logoutOwner() {
@@ -854,10 +798,7 @@ import { createMiniRealtimeUI } from './mini-realtime-ui.js';
   });
   $('#voice-signin').addEventListener('click', begin);
   $('#voice-logout').addEventListener('click', () => void logoutOwner());
-  $('#voice-test').addEventListener('click', () => void speak('Hey, I am Mini. This is the voice you chose for me. How does it sound?', $('#voice-style').value));
-  $('#voice-upload').addEventListener('click', () => void uploadVoiceReference());
-  $('#voice-style').addEventListener('change', () => updateVoiceUi());
-  $('#voice-delete').addEventListener('click', () => void removeVoiceReference());
+  $('#voice-test').addEventListener('click', () => void speak('Hey, I’m Mini. This is my voice. How does it sound?'));
   $('#memory-save').addEventListener('click', () => void syncPrivateProfile());
   $('#memory-forget').addEventListener('click', () => void forgetPrivateProfile());
   $('#clear-local').addEventListener('click', resetData);

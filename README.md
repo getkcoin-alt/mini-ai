@@ -2,7 +2,7 @@
 
 **A little more human. A lot more you.**
 
-Mobile-first Best Friend + Mentor companion. Phase 1A is a deployed interactive frontend; Phase 1B is a private, open-source voice prototype built from **faster-whisper → Ollama 1B → Chatterbox Nano** with two authorized reference styles. There is no ElevenLabs runtime dependency.
+Mobile-first Best Friend + Mentor companion. Phase 1A is a deployed interactive frontend; Phase 1B is a private, open-source voice prototype built from **faster-whisper → Ollama 1B → Chatterbox Nano** speaking in one fixed voice (the authorized Best Friend reference) for every mode and screen; voice upload is disabled. There is no ElevenLabs runtime dependency.
 
 ## Current operational truth
 
@@ -45,11 +45,11 @@ Mini web app (Vercel OR private guest localhost)
 Private Python worker — 1 CPU-heavy inference turn at a time
   ├─ faster-whisper tiny.en: speech-to-text
   ├─ Ollama llama3.2:1b: relevant short answer
-  ├─ Chatterbox Nano: reference-conditioned Friend/Mentor voice
+  ├─ Chatterbox Nano: Mini's one voice (the Best Friend reference); Friend/Mentor change only the words
   └─ opt-in SQLite profile facts only, no stored conversation audio
 ```
 
-Existing voice references stay on private server disk; Git rejects common audio formats. Worker routes under `/v1/*` require a server-held token. The local preview routes are allowed only through a loopback-only listener and an SSH tunnel. Do not publicly expose them.
+Mini's voice reference stays on private server disk and cannot be uploaded, replaced or removed from the app; Git rejects common audio formats. Worker routes under `/v1/*` require a server-held token. The local preview routes are allowed only through a loopback-only listener and an SSH tunnel. Do not publicly expose them.
 
 ## Privacy and constraints
 

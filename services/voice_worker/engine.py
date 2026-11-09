@@ -10,7 +10,6 @@ import json
 import os
 import shutil
 import subprocess
-import tempfile
 import threading
 import wave
 from pathlib import Path
@@ -22,16 +21,21 @@ _TTS_MODELS = {}
 _WHISPER = None
 
 ROOT = Path(os.environ.get("MINI_VOICE_DATA_DIR") or (Path.home() / ".mini-ai" / "voice")).expanduser()
-REFERENCE = ROOT / "reference.wav"  # legacy single reference, still accepted
-REFERENCES = {"friend": ROOT / "reference_friend.wav", "mentor": ROOT / "reference_mentor.wav"}
+# Mini has exactly ONE voice: the bright "Best Friend" reference installed on
+# the worker. Personality (Friend / Mentor) changes only the words, never the
+# voice. Older dual-style installs also hold reference_mentor.wav; it is ignored.
+MINI_VOICE = ROOT / "reference_friend.wav"
+MINI_VOICE_NAME = "mini"
+
+
+class VoiceLocked(PermissionError):
+    """Raised when anything tries to replace or remove Mini's one voice."""
 
 
 def reference_for(mode: str = "friend") -> Path | None:
-    """Pick style-matched voice reference, falling back to either authorized style."""
-    candidates = [REFERENCES.get(mode, REFERENCES["friend"]), REFERENCES["friend"], REFERENCES["mentor"], REFERENCE]
-    for path in candidates:
-        if path.is_file() and path.stat().st_size > 10000:
-            return path
+    """Return Mini's single voice reference. `mode` is accepted but ignored."""
+    if MINI_VOICE.is_file() and MINI_VOICE.stat().st_size > 10000:
+        return MINI_VOICE
     return None
 
 PROMPTS = {
@@ -67,7 +71,10 @@ def ensure_private_dir():
 def status():
     return {
         "referenceReady": reference_for() is not None,
-        "referenceModes": {mode: path.is_file() and path.stat().st_size > 10000 for mode, path in REFERENCES.items()},
+        "voice": MINI_VOICE_NAME,
+        "voiceLocked": True,
+        # Kept for older clients: both personalities share the one voice.
+        "referenceModes": {mode: reference_for() is not None for mode in ("friend", "mentor")},
         "ttsEngine": "Chatterbox (zero-shot reference voice)",
         "sttEngine": "faster-whisper",
         "brain": os.environ.get("MINI_OLLAMA_MODEL", "llama3.2:1b"),
@@ -103,35 +110,11 @@ def ffmpeg_convert(audio: bytes, *, sample_rate: int, max_secs: int) -> bytes:
 
 
 def save_reference(audio: bytes, mode: str = "friend"):
-    if mode not in REFERENCES:
-        raise ValueError("Voice style must be friend or mentor")
-    """Replace the current sample only after explicit voice-owner consent."""
-    wav = ffmpeg_convert(audio, sample_rate=24000, max_secs=20)
-    with wave.open(io.BytesIO(wav), "rb") as sound:
-        seconds = sound.getnframes() / sound.getframerate()
-    if seconds < 3:
-        raise ValueError("Please provide at least 3 seconds of clear speech.")
-    ensure_private_dir()
-    fd, tmp = tempfile.mkstemp(prefix=".reference-", suffix=".wav", dir=str(ROOT))
-    try:
-        with os.fdopen(fd, "wb") as file:
-            file.write(wav)
-        os.chmod(tmp, 0o600)
-        os.replace(tmp, REFERENCES[mode])
-    finally:
-        if os.path.exists(tmp):
-            os.unlink(tmp)
-    return round(seconds, 1)
+    raise VoiceLocked("Mini has one fixed voice; it cannot be replaced.")
 
 
 def delete_reference(mode: str = "friend"):
-    if mode not in REFERENCES:
-        raise ValueError("Voice style must be friend or mentor")
-    try:
-        REFERENCES[mode].unlink()
-        return True
-    except FileNotFoundError:
-        return False
+    raise VoiceLocked("Mini has one fixed voice; it cannot be removed.")
 
 
 def _device():
@@ -160,10 +143,10 @@ def _get_tts(language: str):
 
 
 def synthesize(text: str, language: str = "en", mode: str = "friend") -> bytes:
-    """Run entirely on the local worker; choose a reference by Mini personality."""
+    """Run entirely on the local worker, always in Mini's one voice."""
     reference = reference_for(mode)
     if reference is None:
-        raise VoiceNotReady("Upload an authorized recording before generating cloned speech.")
+        raise VoiceNotReady("Mini's voice is not installed on this worker.")
     language = "hi" if language == "hi" else "en"
     if not isinstance(text, str) or not text.strip():
         raise ValueError("Speech text is empty.")
