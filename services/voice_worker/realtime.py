@@ -80,6 +80,14 @@ async def verify_supabase_token(access_token: str) -> dict | None:
     return None
 
 
+def _private(text: str) -> str:
+    """What users say and what Mini replies never goes to the server log in
+    production; only its length. MINI_LOG_TRANSCRIPTS=1 is for local debugging."""
+    if os.environ.get("MINI_LOG_TRANSCRIPTS") == "1":
+        return repr(text)
+    return f"[{len(text or '')} chars]"
+
+
 FIRST_CLAUSE_MIN_CHARS = 12
 FIRST_CLAUSE_MAX_WORDS = 7
 
@@ -358,7 +366,7 @@ class MiniRealtimeSession:
 
         transcript = await loop.run_in_executor(None, _do_stt)
         stt_ms = (time.perf_counter() - t0) * 1000
-        logger.info("STT final: '%s' in %.1f ms", transcript, stt_ms)
+        logger.info("STT final: %s in %.1f ms", _private(transcript), stt_ms)
 
         if not transcript or len(transcript) < 2:
             return
@@ -508,8 +516,8 @@ class MiniRealtimeSession:
             total_ms = round((time.perf_counter() - t_start) * 1000)
             await self.send_json({"type": "pipeline.timing", "response_id": response_id, **timing, "total_ms": total_ms})
             await self.send_json({"type": "response.finished", "response_id": response_id})
-            logger.info("Response %s: llm_first=%sms first_audio=%sms total=%sms '%s'", response_id,
-                        timing["llm_first_token_ms"], timing["first_audio_ms"], total_ms, complete_text)
+            logger.info("Response %s: llm_first=%sms first_audio=%sms total=%sms %s", response_id,
+                        timing["llm_first_token_ms"], timing["first_audio_ms"], total_ms, _private(complete_text))
 
     async def _speak_clauses(self, response_id: str, stream_id: int, clauses: asyncio.Queue,
                              timing: dict, t_start: float):
@@ -535,8 +543,8 @@ class MiniRealtimeSession:
                     if response_id in self.cancelled_response_ids:
                         return
                     await self.send_audio_chunk(stream_id, pcm_bytes[offset:offset + MAX_OUTPUT_CHUNK_BYTES])
-            logger.info("TTS clause %.0f ms for %.1f s audio (queued at +%.0f ms): %r",
-                        (time.perf_counter() - t_clause) * 1000, audio_s, (t_clause - t_start) * 1000, clause[:60])
+            logger.info("TTS clause %.0f ms for %.1f s audio (queued at +%.0f ms): %s",
+                        (time.perf_counter() - t_clause) * 1000, audio_s, (t_clause - t_start) * 1000, _private(clause))
         if started and response_id not in self.cancelled_response_ids:
             await self.send_json({"type": "response.audio.end", "response_id": response_id})
 
