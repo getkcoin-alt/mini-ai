@@ -1,6 +1,6 @@
 import { miniIdentity } from './mini-supabase.js';
 import { MiniRealtimeSession } from './mini-realtime-client.js';
-import { MINI_REALTIME_PROTOCOL, MINI_WS_PATH } from './mini-realtime-protocol.js';
+import { MINI_REALTIME_PROTOCOL, MINI_WS_PATH, miniLiveWsUrl } from './mini-realtime-protocol.js';
 
 const stageMap = Object.freeze({
   vad:'vad', stt:'stt', llm:'llm', tts:'tts',
@@ -74,10 +74,14 @@ export function createMiniRealtimeUI({getMode, onNotice=()=>{}}) {
         ? 'Your account session expired.' : 'Mini gateway status is unavailable.');
       const dataReady=await res.json();
       ready=dataReady.enabled===true &&
-        dataReady.protocol===MINI_REALTIME_PROTOCOL && dataReady.wsPath===MINI_WS_PATH;
+        dataReady.protocol===MINI_REALTIME_PROTOCOL && dataReady.wsPath===MINI_WS_PATH &&
+        Boolean(miniLiveWsUrl(dataReady.wsUrl));
       if(ready) {
         setBadge('Secure gateway ready','live');
-        explain('Use the microphone to talk. Silero detects interruptions; Mini speaks in your authorized voice.');
+        explain('Tap Start and just talk. Mini listens, answers in its own voice, and you can interrupt it anytime.');
+      } else if(dataReady.reason==='owner_only') {
+        setBadge('Owner only');
+        explain('Live conversation is limited to the owner account for now.');
       } else {
         setBadge('Gateway pending');
         explain('NFC streaming gateway and approved Friend/Mentor voice must pass tests before live calls are enabled.');

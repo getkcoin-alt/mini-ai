@@ -32,8 +32,9 @@ async def lifespan(_app: FastAPI):
     if os.environ.get("MINI_PRELOAD_TTS", "0") == "1" and engine.reference_for("friend"):
         try:
             with resource_limits.reserve_inference(model_loaded=False):
-                engine._get_tts("en")
-            logger.info("Chatterbox Nano loaded once for the private voice worker")
+                with engine.MODEL_LOCK:
+                    engine._conditioned_tts("en")
+            logger.info("Chatterbox loaded and conditioned on Mini's voice once")
         except (resource_limits.VoiceMemoryLow, resource_limits.VoiceBusy, Exception) as exc:
             logger.warning("Optional voice prewarm unavailable; running cold: %s", exc)
     yield
@@ -308,9 +309,10 @@ def health():
     return {"service": "mini-private-local-voice", "status": "up"}
 
 
-async def _run_realtime(websocket: WebSocket, *, allow_local_dev: bool):
+async def _run_realtime(websocket: WebSocket, *, allow_local_dev: bool, require_ticket: bool = False):
     from . import realtime
-    session = realtime.MiniRealtimeSession(websocket, allow_local_dev_token=allow_local_dev)
+    session = realtime.MiniRealtimeSession(websocket, allow_local_dev_token=allow_local_dev,
+                                           require_ticket=require_ticket)
     await session.handle_connection()
 
 
@@ -324,6 +326,16 @@ async def protected_realtime_ws(websocket: WebSocket):
         await websocket.close(code=1008, reason="Worker authentication required")
         return
     await _run_realtime(websocket, allow_local_dev=False)
+
+
+@app.websocket("/v1/realtime/browser")
+async def browser_realtime_ws(websocket: WebSocket):
+    # Only the Mini site may open this; session.start must then carry a valid
+    # Vercel-issued ticket AND a Supabase session for the same user.
+    if not ws_auth.realtime_origin_allowed(websocket.headers.get("origin")):
+        await websocket.close(code=1008, reason="Origin not allowed")
+        return
+    await _run_realtime(websocket, allow_local_dev=False, require_ticket=True)
 
 
 @app.websocket("/api/voice/realtime")

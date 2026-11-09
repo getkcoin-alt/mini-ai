@@ -60,6 +60,11 @@ class VoiceNotReady(RuntimeError):
     pass
 
 
+def llm_threads() -> int:
+    """Ollama threads; kept separate so the LLM and the voice can overlap."""
+    return int(os.environ.get("MINI_LLM_THREADS") or os.environ.get("MINI_CPU_THREADS", "2"))
+
+
 def ensure_private_dir():
     ROOT.mkdir(mode=0o700, parents=True, exist_ok=True)
     try:
@@ -131,6 +136,9 @@ def _get_tts(language: str):
         key = "turbo-" + device if device != "cpu" else "nano-cpu"
     with MODEL_LOCK:
         if key not in _TTS_MODELS:
+            if device == "cpu" and os.environ.get("MINI_CPU_THREADS"):
+                import torch
+                torch.set_num_threads(int(os.environ["MINI_CPU_THREADS"]))
             if language != "en":
                 from chatterbox.mtl_tts import ChatterboxMultilingualTTS
                 _TTS_MODELS[key] = ChatterboxMultilingualTTS.from_pretrained(device=device, t3_model="v3")
@@ -142,24 +150,48 @@ def _get_tts(language: str):
         return _TTS_MODELS[key]
 
 
-def synthesize(text: str, language: str = "en", mode: str = "friend") -> bytes:
-    """Run entirely on the local worker, always in Mini's one voice."""
-    reference = reference_for(mode)
+_VOICE_CONDS = {}  # model key -> (reference path, mtime) the model is conditioned on
+
+
+def _conditioned_tts(language: str):
+    """Return a TTS model already conditioned on Mini's voice.
+
+    Reading and embedding the reference clip costs ~2.3 s on CPU, so it is
+    done once per model (and again only if the reference file changes),
+    not on every sentence. Caller must hold MODEL_LOCK.
+    """
+    reference = reference_for()
     if reference is None:
         raise VoiceNotReady("Mini's voice is not installed on this worker.")
+    model = _get_tts(language)
+    stamp = (str(reference), reference.stat().st_mtime_ns)
+    if _VOICE_CONDS.get(id(model)) != stamp:
+        model.prepare_conditionals(str(reference))
+        _VOICE_CONDS[id(model)] = stamp
+    return model
+
+
+def synthesize_samples(text: str, language: str = "en"):
+    """Generate Mini's voice for `text`; returns (float32 numpy samples, sample rate)."""
     language = "hi" if language == "hi" else "en"
     if not isinstance(text, str) or not text.strip():
         raise ValueError("Speech text is empty.")
     with MODEL_LOCK:
-        model = _get_tts(language)
+        model = _conditioned_tts(language)
         if language == "en":
-            wav = model.generate(text[:600], audio_prompt_path=str(reference))
+            wav = model.generate(text[:600])
         else:
-            wav = model.generate(text[:600], audio_prompt_path=str(reference), language_id=language)
-        import soundfile as sf
-        output = io.BytesIO()
-        sf.write(output, wav.squeeze().detach().cpu().numpy(), model.sr, format="WAV", subtype="PCM_16")
-        return output.getvalue()
+            wav = model.generate(text[:600], language_id=language)
+        return wav.squeeze().detach().cpu().numpy(), model.sr
+
+
+def synthesize(text: str, language: str = "en", mode: str = "friend") -> bytes:
+    """Run entirely on the local worker, always in Mini's one voice."""
+    samples, rate = synthesize_samples(text, language)
+    import soundfile as sf
+    output = io.BytesIO()
+    sf.write(output, samples, rate, format="WAV", subtype="PCM_16")
+    return output.getvalue()
 
 
 def transcribe(audio: bytes):
@@ -207,12 +239,12 @@ def reply_to(text: str, *, mode: str, language: str = "en", profile: dict | None
                 "stream": False,
                 # On this shared 16-GiB VPS, don't keep a 1B model resident
                 # while Chatterbox loads several GiB of model weights.
-                "keep_alive": os.environ.get("MINI_OLLAMA_KEEP_ALIVE", "0"),
+                "keep_alive": os.environ.get("MINI_OLLAMA_KEEP_ALIVE", "30m"),
                 "messages": [
                     {"role": "system", "content": system},
                     {"role": "user", "content": text[:1200]},
                 ],
-                "options": {"temperature": 0.7, "num_predict": 80, "num_ctx": 2048, "num_thread": int(os.environ.get("MINI_CPU_THREADS", "2"))}
+                "options": {"temperature": 0.7, "num_predict": 80, "num_ctx": 2048, "num_thread": llm_threads()}
             })
             response.raise_for_status()
             answer = str(response.json().get("message", {}).get("content", "")).strip()

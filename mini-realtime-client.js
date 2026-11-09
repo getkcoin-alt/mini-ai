@@ -1,7 +1,7 @@
 import { miniIdentity, currentMiniUser } from './mini-supabase.js';
 import {
   MINI_REALTIME_PROTOCOL, MINI_INPUT_RATE, MINI_OUTPUT_RATE, MINI_FRAME_BYTES,
-  MINI_MAX_IN_FLIGHT_BYTES, MINI_WS_PATH, miniSameOriginWs,
+  MINI_MAX_IN_FLIGHT_BYTES, MINI_WS_PATH, miniLiveWsUrl,
   miniParseAudioPacket, miniTextEvent
 } from './mini-realtime-protocol.js';
 
@@ -67,8 +67,9 @@ export class MiniRealtimeSession {
     if (!response.ok) throw new Error('Mini voice service readiness could not be checked.');
     const settings = await response.json();
     if (settings.enabled !== true || settings.protocol !== MINI_REALTIME_PROTOCOL ||
-        settings.wsPath !== MINI_WS_PATH)
+        settings.wsPath !== MINI_WS_PATH || !miniLiveWsUrl(settings.wsUrl) || typeof settings.ticket !== 'string')
       throw new Error('Streaming Mini voice is not connected yet. Existing voice mode remains available.');
+    this.ticket = settings.ticket;
 
     this.accessToken = token;
     this.setState('connecting');
@@ -82,7 +83,7 @@ export class MiniRealtimeSession {
     this.outputNode.connect(this.outputContext.destination);
     this.outputNode.port.onmessage = e => this.playbackEvent(e.data);
     await this.outputContext.resume();
-    const ws = new WebSocket(miniSameOriginWs(window.location));
+    const ws = new WebSocket(miniLiveWsUrl(settings.wsUrl));
     this.socket = ws;
     ws.binaryType = 'arraybuffer';
     const connected = new Promise((resolve,reject) => {
@@ -98,12 +99,13 @@ export class MiniRealtimeSession {
     if (this.closed) throw new Error('Mini connection closed unexpectedly.');
     this.send({
       type:'session.start', protocol:MINI_REALTIME_PROTOCOL,
-      access_token:this.accessToken, mode,
+      access_token:this.accessToken, ticket:this.ticket, mode,
       audio_input:{format:'pcm16',channels:1,sample_rate:MINI_INPUT_RATE,frame_ms:20},
       audio_output:{format:'pcm16',channels:1,sample_rate:MINI_OUTPUT_RATE},
       playback_ack:true
     });
     this.accessToken = null; // token is not retained as a long-lived field.
+    this.ticket = null; // single-use pass
     this.setState('authenticating');
     this.authTimeout = setTimeout(()=>{
       if (this.status === 'authenticating') this.fail(new Error('Mini did not verify your voice session.'));

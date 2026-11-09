@@ -3,8 +3,8 @@
 Modular streaming architecture on NFC private VM:
 - Framing & Silero VAD (16kHz PCM16 LE, 20ms = 320 samples)
 - Streaming STT via faster-whisper (tiny.en, int8 on CPU)
-- Streaming LLM via local Ollama llama3.2:1b (keep_alive: 5m)
-- Streaming TTS via Kyutai Pocket TTS (with Chatterbox Nano quality fallback)
+- Streaming LLM via local Ollama (MINI_OLLAMA_MODEL, kept warm)
+- Clause-streamed TTS in Mini's one voice (Chatterbox, conditioning cached)
 - Binary PCM16 24kHz downlink [0x02][uint32 LE stream_id][payload]
 - Genuine barge-in interruption & playback truncation
 - Supabase JWT authentication gate
@@ -80,6 +80,33 @@ async def verify_supabase_token(access_token: str) -> dict | None:
     return None
 
 
+FIRST_CLAUSE_MIN_CHARS = 12
+FIRST_CLAUSE_MAX_WORDS = 7
+
+
+def split_clause(buffer: str, *, first: bool) -> tuple[str, str] | None:
+    """Return (clause_to_speak, remainder) once `buffer` holds a speakable clause.
+
+    Sentence ends (. ! ?) always cut. The first clause also cuts at a comma
+    or after a few words so speech starts sooner; later clauses cut at a
+    comma only when long, to keep prosody natural.
+    """
+    for i, ch in enumerate(buffer):
+        if ch in ".!?\n" and i + 1 < len(buffer) and buffer[i + 1] in " \n\"')":
+            clause = buffer[:i + 1].strip()
+            if clause:
+                return clause, buffer[i + 1:]
+        if ch in ",;:" and (len(buffer[:i]) >= (FIRST_CLAUSE_MIN_CHARS if first else 60)):
+            if i + 1 < len(buffer):
+                return buffer[:i + 1].strip(), buffer[i + 1:]
+    if first:
+        words = buffer.split(" ")
+        if len(words) > FIRST_CLAUSE_MAX_WORDS + 1 and len(buffer) >= FIRST_CLAUSE_MIN_CHARS:
+            head = " ".join(words[:FIRST_CLAUSE_MAX_WORDS])
+            return head.strip(), buffer[len(head):]
+    return None
+
+
 class SileroVADDetector:
     def __init__(self, model):
         self.model = model
@@ -140,9 +167,10 @@ class SileroVADDetector:
 
 
 class MiniRealtimeSession:
-    def __init__(self, websocket: WebSocket, allow_local_dev_token: bool = False):
+    def __init__(self, websocket: WebSocket, allow_local_dev_token: bool = False, require_ticket: bool = False):
         self.ws = websocket
         self.allow_local_dev_token = allow_local_dev_token
+        self.require_ticket = require_ticket
         self.session_id = f"sess_{uuid.uuid4().hex[:12]}"
         self.user_id: str | None = None
         self.mode = "friend"
@@ -227,8 +255,14 @@ class MiniRealtimeSession:
                 return
 
             access_token = event.get("access_token")
-            user = (ws_auth.local_dev_identity(access_token, self.allow_local_dev_token)
-                    or await verify_supabase_token(access_token))
+            ticket_user = ws_auth.verify_realtime_ticket(event.get("ticket")) if self.require_ticket else None
+            if self.require_ticket and not ticket_user:
+                user = None
+            else:
+                user = (ws_auth.local_dev_identity(access_token, self.allow_local_dev_token)
+                        or await verify_supabase_token(access_token))
+            if user and self.require_ticket and user.get("id") != ticket_user:
+                user = None
             if not user or not user.get("id"):
                 await self.send_json({"type": "session.error", "message": "Authentication failed: invalid or expired token"})
                 await self.ws.close(code=4401, reason="Unauthorized")
@@ -365,137 +399,109 @@ class MiniRealtimeSession:
                 self.current_response_id = None
 
     async def _run_llm_and_tts(self, response_id: str, user_transcript: str):
-        # Build prompt
+        """Stream LLM text into a clause queue while a separate task voices it.
+
+        The LLM never waits for speech synthesis. The first clause is cut
+        short (first comma or ~6 words) so Mini starts talking as early as
+        possible; later clauses follow sentence boundaries. All clauses of one
+        reply share ONE response.audio.start / response.audio.end pair so the
+        browser does not flush already-buffered speech between sentences.
+        """
+        t_start = time.perf_counter()
         system_prompt = engine.PROMPTS.get(self.mode, engine.PROMPTS["friend"])
         details = self.owner_profile_facts()
         if details:
             system_prompt += "\nUser profile facts:\n" + "\n".join(details)
-
         messages = [
             {"role": "system", "content": system_prompt},
-            *self.conversation_history[-4:],
+            *self.conversation_history[-6:],
             {"role": "user", "content": user_transcript},
         ]
-
         ollama_url = (os.environ.get("MINI_OLLAMA_URL") or "http://127.0.0.1:11434").rstrip("/")
-        full_assistant_reply = []
-        clause_buffer = []
-
         self.current_stream_id += 1
         stream_id = self.current_stream_id
+        clauses: asyncio.Queue = asyncio.Queue()
+        timing = {"llm_first_token_ms": None, "first_audio_ms": None}
+        speaker = asyncio.create_task(self._speak_clauses(response_id, stream_id, clauses, timing, t_start))
 
-        loop = asyncio.get_running_loop()
-
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            async with client.stream(
-                "POST",
-                f"{ollama_url}/api/chat",
-                json={
+        full_reply: list[str] = []
+        buffer = ""
+        clauses_sent = 0
+        try:
+            async with httpx.AsyncClient(timeout=60.0, trust_env=False) as client:
+                async with client.stream("POST", f"{ollama_url}/api/chat", json={
                     "model": os.environ.get("MINI_OLLAMA_MODEL", "llama3.2:1b"),
                     "messages": messages,
                     "stream": True,
-                    "keep_alive": "5m",
-                    "options": {
-                        "num_predict": 100,
-                        "temperature": 0.6,
-                    },
-                },
-            ) as stream_resp:
-                async for line in stream_resp.aiter_lines():
-                    if response_id in self.cancelled_response_ids:
-                        logger.info("Streaming aborted due to cancellation")
-                        return
-
-                    if not line:
-                        continue
-
-                    try:
-                        chunk_json = json.loads(line)
-                    except Exception:
-                        continue
-
-                    delta = chunk_json.get("message", {}).get("content", "")
-                    if delta:
-                        full_assistant_reply.append(delta)
-                        clause_buffer.append(delta)
-                        await self.send_json({
-                            "type": "response.text.delta",
-                            "response_id": response_id,
-                            "text": delta,
-                        })
-
-                        # Check for clause boundary (. ! ? , ; \n)
-                        clause_text = "".join(clause_buffer)
-                        if (
-                            any(punct in delta for punct in [".", "!", "?", "\n"])
-                            or (len(clause_text) > 40 and any(punct in delta for punct in [",", ";"]))
-                        ):
-                            clause_to_speak = clause_text.strip()
-                            clause_buffer = []
-                            if clause_to_speak:
-                                await self._synthesize_and_stream_clause(
-                                    response_id, stream_id, clause_to_speak
-                                )
-
-                    if chunk_json.get("done", False):
-                        break
-
-        # Synthesize any remaining clause
-        remaining_clause = "".join(clause_buffer).strip()
-        if remaining_clause and response_id not in self.cancelled_response_ids:
-            await self._synthesize_and_stream_clause(response_id, stream_id, remaining_clause)
+                    "keep_alive": os.environ.get("MINI_OLLAMA_KEEP_ALIVE", "30m"),
+                    "options": {"num_predict": 100, "temperature": 0.6, "num_ctx": 2048,
+                                "num_thread": engine.llm_threads()},
+                }) as stream_resp:
+                    async for line in stream_resp.aiter_lines():
+                        if response_id in self.cancelled_response_ids:
+                            return
+                        if not line:
+                            continue
+                        try:
+                            chunk_json = json.loads(line)
+                        except Exception:
+                            continue
+                        delta = chunk_json.get("message", {}).get("content", "")
+                        if delta:
+                            if timing["llm_first_token_ms"] is None:
+                                timing["llm_first_token_ms"] = round((time.perf_counter() - t_start) * 1000)
+                            full_reply.append(delta)
+                            buffer += delta
+                            await self.send_json({"type": "response.text.delta", "response_id": response_id, "text": delta})
+                            cut = split_clause(buffer, first=clauses_sent == 0)
+                            if cut:
+                                clause, buffer = cut
+                                clauses.put_nowait(clause)
+                                clauses_sent += 1
+                        if chunk_json.get("done", False):
+                            break
+            if buffer.strip() and response_id not in self.cancelled_response_ids:
+                clauses.put_nowait(buffer.strip())
+        finally:
+            clauses.put_nowait(None)
+            if response_id in self.cancelled_response_ids:
+                speaker.cancel()
+            try:
+                await speaker
+            except asyncio.CancelledError:
+                pass
 
         if response_id not in self.cancelled_response_ids:
-            complete_text = "".join(full_assistant_reply).strip()
+            complete_text = "".join(full_reply).strip()
             self.conversation_history.append({"role": "user", "content": user_transcript})
             self.conversation_history.append({"role": "assistant", "content": complete_text})
-
+            total_ms = round((time.perf_counter() - t_start) * 1000)
+            await self.send_json({"type": "pipeline.timing", "response_id": response_id, **timing, "total_ms": total_ms})
             await self.send_json({"type": "response.finished", "response_id": response_id})
-            logger.info("Completed response %s: '%s'", response_id, complete_text)
+            logger.info("Response %s: llm_first=%sms first_audio=%sms total=%sms '%s'", response_id,
+                        timing["llm_first_token_ms"], timing["first_audio_ms"], total_ms, complete_text)
 
-    async def _synthesize_and_stream_clause(self, response_id: str, stream_id: int, clause: str):
-        if response_id in self.cancelled_response_ids or not clause:
-            return
-
+    async def _speak_clauses(self, response_id: str, stream_id: int, clauses: asyncio.Queue,
+                             timing: dict, t_start: float):
         loop = asyncio.get_running_loop()
-        mode = self.mode
-
-        def _synthesize_pcm():
-            # 1. Try Pocket TTS if accessible
-            # 2. Fall back to Chatterbox Nano
-            with engine.MODEL_LOCK:
-                ref = engine.reference_for(mode)
-                tts = engine._get_tts("en")
-                wav = tts.generate(clause[:300], audio_prompt_path=str(ref))
-                samples = wav.squeeze().detach().cpu().numpy()
-                pcm16 = (np.clip(samples, -1.0, 1.0) * 32767).astype("<i2").tobytes()
-                return pcm16
-
-        t0 = time.perf_counter()
-        pcm_bytes = await loop.run_in_executor(None, _synthesize_pcm)
-        gen_ms = (time.perf_counter() - t0) * 1000
-
-        if response_id in self.cancelled_response_ids:
-            logger.info("Synthesized clause discarded due to cancellation")
-            return
-
-        await self.send_json({
-            "type": "response.audio.start",
-            "response_id": response_id,
-            "stream_id": stream_id,
-        })
-
-        # Stream binary frames of up to 3840 bytes (80ms at 24kHz)
-        offset = 0
-        while offset < len(pcm_bytes):
+        started = False
+        while True:
+            clause = await clauses.get()
+            if clause is None or response_id in self.cancelled_response_ids:
+                break
+            samples, _rate = await loop.run_in_executor(None, engine.synthesize_samples, clause[:300], "en")
             if response_id in self.cancelled_response_ids:
                 break
-            chunk = pcm_bytes[offset : offset + MAX_OUTPUT_CHUNK_BYTES]
-            await self.send_audio_chunk(stream_id, chunk)
-            offset += len(chunk)
-            await asyncio.sleep(0.005)
-
-        if response_id not in self.cancelled_response_ids:
+            pcm_bytes = (np.clip(samples, -1.0, 1.0) * 32767).astype("<i2").tobytes()
+            if not started:
+                started = True
+                timing["first_audio_ms"] = round((time.perf_counter() - t_start) * 1000)
+                await self.send_json({"type": "response.audio.start", "response_id": response_id, "stream_id": stream_id})
+            for offset in range(0, len(pcm_bytes), MAX_OUTPUT_CHUNK_BYTES):
+                if response_id in self.cancelled_response_ids:
+                    return
+                await self.send_audio_chunk(stream_id, pcm_bytes[offset:offset + MAX_OUTPUT_CHUNK_BYTES])
+        if started and response_id not in self.cancelled_response_ids:
             await self.send_json({"type": "response.audio.end", "response_id": response_id})
 
     def cleanup(self):

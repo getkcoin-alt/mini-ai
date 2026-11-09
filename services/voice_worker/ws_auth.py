@@ -64,3 +64,54 @@ def browser_origin_refused(path: str, origin: str | None) -> bool:
     emitted, so browsers also block reading responses.
     """
     return path.startswith("/v1/") and bool(origin)
+
+
+# --- Browser live voice (Phase A) -------------------------------------------
+# The browser cannot hold the worker token, and Vercel functions cannot proxy
+# WebSockets. Vercel therefore issues the signed-in owner a short-lived ticket
+# signed with the shared worker token, and the browser connects straight to
+# /v1/realtime/browser. The worker also re-verifies the Supabase session and
+# requires both to name the same user.
+
+TICKET_CONTEXT = b"mini.realtime.ticket.v1."
+TICKET_MAX_TTL = 300
+_USED_NONCES: dict[str, int] = {}
+
+
+def realtime_origin_allowed(origin: str | None) -> bool:
+    allowed = {o.strip().rstrip("/") for o in os.environ.get("MINI_REALTIME_ALLOWED_ORIGINS", "").split(",") if o.strip()}
+    return bool(origin) and origin.rstrip("/") in allowed
+
+
+def _b64url_decode(value: str) -> bytes:
+    import base64
+    return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
+
+
+def verify_realtime_ticket(ticket: str | None, now: float | None = None) -> str | None:
+    """Return the ticket's user id if it is authentic, unexpired and unused."""
+    import json
+    import time
+    secret = os.environ.get("MINI_WORKER_TOKEN", "")
+    if len(secret) < MIN_SECRET_LENGTH or not isinstance(ticket, str) or len(ticket) > 1024 or ticket.count(".") != 1:
+        return None
+    payload_b64, sig_b64 = ticket.split(".")
+    expected = hmac.new(secret.encode(), TICKET_CONTEXT + payload_b64.encode(), "sha256").digest()
+    try:
+        if not hmac.compare_digest(expected, _b64url_decode(sig_b64)):
+            return None
+        payload = json.loads(_b64url_decode(payload_b64))
+    except (ValueError, TypeError):
+        return None
+    now = time.time() if now is None else now
+    sub, exp, nonce = payload.get("sub"), payload.get("exp"), payload.get("nonce")
+    if (not isinstance(sub, str) or not sub or not isinstance(exp, int) or not isinstance(nonce, str)
+            or not 16 <= len(nonce) <= 64 or exp <= now or exp > now + TICKET_MAX_TTL):
+        return None
+    for old, old_exp in list(_USED_NONCES.items()):
+        if old_exp <= now:
+            del _USED_NONCES[old]
+    if nonce in _USED_NONCES:
+        return None
+    _USED_NONCES[nonce] = exp
+    return sub
