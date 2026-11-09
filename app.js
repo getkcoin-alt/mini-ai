@@ -1,6 +1,7 @@
 import { createVoiceRequestGate, voiceResponseError } from './voice-request-gate.js';
 import { installMiniAccountUI } from './mini-identity-ui.js';
 import { createMiniRealtimeUI } from './mini-realtime-ui.js';
+import { miniIdentity } from './mini-supabase.js';
 
 /* Mini AI — frontend-only interactive prototype.
  * Important: browser speech APIs and scripted demo responses are NOT an AI backend,
@@ -688,6 +689,7 @@ import { createMiniRealtimeUI } from './mini-realtime-ui.js';
       updateVoiceUi();
       if (canSyncProfile()) void readMemoryStatus();
       if (state.voiceStatus.authReady && data.googleClientId) initGoogleButton(data.googleClientId);
+      if (state.voiceStatus.authReady && !state.voiceStatus.ownerSignedIn && state.supaUser?.id && !ownerLinkInFlight) void linkOwnerVoice();
     } catch (_) {
       state.voiceStatus = { authReady: false, ownerSignedIn: false, workerReady: false, referenceReady: false, localStandalone: false, voiceReady: false };
       updateVoiceUi();
@@ -733,6 +735,33 @@ import { createMiniRealtimeUI } from './mini-realtime-ui.js';
     };
     script.onerror = () => toast('Google sign-in scripts are blocked in this browser.');
     document.head.append(script);
+  }
+
+  // The owner signs in once (Mini account via Supabase). The server checks
+  // that account and, only for the configured owner, unlocks private voice.
+  let ownerLinkInFlight = null;
+  function linkOwnerVoice({ announce = false } = {}) {
+    if (ownerLinkInFlight) return ownerLinkInFlight;
+    ownerLinkInFlight = (async () => {
+      try {
+        const { data } = await (miniIdentity()?.auth.getSession() ?? Promise.resolve({ data: null }));
+        const token = data?.session?.access_token;
+        if (!token) { if (announce) toast('Sign in to Mini first.'); return false; }
+        const res = await fetch('/api/auth/supabase-owner', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { Authorization: 'Bearer ' + token }
+        });
+        const result = await res.json().catch(() => ({}));
+        if (!res.ok) { if (announce) toast(result.error || 'Private voice sign-in failed.'); return false; }
+        await refreshVoiceStatus();
+        if (announce) toast('Private Mini voice unlocked.');
+        return true;
+      } catch (_) {
+        if (announce) toast('Private voice sign-in failed. Please try again.');
+        return false;
+      } finally { ownerLinkInFlight = null; }
+    })();
+    return ownerLinkInFlight;
   }
 
   async function logoutOwner() {
@@ -796,7 +825,7 @@ import { createMiniRealtimeUI } from './mini-realtime-ui.js';
     state.voiceOutput = event.target.checked;
     if (!state.voiceOutput) {stopVoicePlayback(); miniLive.stop();}
   });
-  $('#voice-signin').addEventListener('click', begin);
+  $('#voice-signin').addEventListener('click', () => { if (state.supaUser?.id) void linkOwnerVoice({ announce: true }); else begin(); });
   $('#voice-logout').addEventListener('click', () => void logoutOwner());
   $('#voice-test').addEventListener('click', () => void speak('Hey, I’m Mini. This is my voice. How does it sound?'));
   $('#memory-save').addEventListener('click', () => void syncPrivateProfile());
@@ -832,6 +861,7 @@ import { createMiniRealtimeUI } from './mini-realtime-ui.js';
       // straight to onboarding step 1 unless the saved profile already has a name.
       if (newlySignedIn && !state.completed.name) startSetup();
       void miniLive.setUser(user);
+      if (user?.id && state.voiceStatus.authReady && !state.voiceStatus.ownerSignedIn) void linkOwnerVoice();
       updateMemoryUi();
     },
     getProfile: () => ({ profile: state.profile, completed: state.completed }),
