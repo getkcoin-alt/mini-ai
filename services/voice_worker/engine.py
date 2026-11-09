@@ -8,6 +8,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import threading
@@ -58,6 +59,13 @@ PROMPTS = {
 
 class VoiceNotReady(RuntimeError):
     pass
+
+
+def ollama_keep_alive():
+    """MINI_OLLAMA_KEEP_ALIVE as Ollama expects it: "30m"-style durations stay
+    strings, bare numbers (e.g. -1 = keep loaded forever) must be integers."""
+    value = os.environ.get("MINI_OLLAMA_KEEP_ALIVE", "30m").strip()
+    return int(value) if re.fullmatch(r"-?\d+", value) else value
 
 
 def llm_threads() -> int:
@@ -250,7 +258,7 @@ def reply_to(text: str, *, mode: str, language: str = "en", profile: dict | None
                 "stream": False,
                 # On this shared 16-GiB VPS, don't keep a 1B model resident
                 # while Chatterbox loads several GiB of model weights.
-                "keep_alive": os.environ.get("MINI_OLLAMA_KEEP_ALIVE", "30m"),
+                "keep_alive": ollama_keep_alive(),
                 "messages": [
                     {"role": "system", "content": system},
                     {"role": "user", "content": text[:1200]},
