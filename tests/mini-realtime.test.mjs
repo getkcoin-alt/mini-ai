@@ -52,7 +52,8 @@ test('invalid control messages never execute as dynamic code',()=>{
 test('client never contains a token in URL or exposes master worker credential',()=>{
   const source=readFileSync(new URL('../mini-realtime-client.js',import.meta.url),'utf8');
   assert.match(source,/access_token:this\.accessToken/);
-  assert.match(source,/miniSameOriginWs\(window\.location\)/);
+  assert.match(source,/new WebSocket\(miniLiveWsUrl\(settings\.wsUrl\)\)/);
+  assert.match(source,/ticket:this\.ticket/);
   assert.doesNotMatch(source,/MINI_WORKER_TOKEN|service_role|[?&]token=/);
   assert.match(source,/response\.cancel/);
   assert.match(source,/heard_ms/);

@@ -21,24 +21,41 @@ Phase 1A's design prototype is implemented; full real authentication is not fini
 
 | Capability | Status |
 | --- | --- |
-| Chatterbox Nano with authorized Friend/Mentor references | Verified on scrizaone |
-| Ollama llama3.2:1b replies | Verified on scrizaone |
-| Ollama -> cloned voice text response | Verified on scrizaone |
-| Faster-whisper microphone -> Ollama -> cloned voice | Implemented; browser end-to-end test pending |
-| Private profile persistence with explicit consent and deletion | Implemented; unit tests, NFC runtime test pending |
-| Owner-only Vercel HTTPS gateway | Implemented; Google OAuth and private worker endpoint not configured |
-| Per-turn CPU/RAM guard + optional warm model | Implemented; live worker test pending |
-| Guest systemd service with non-root user and resource ceilings | Implemented; new guest boot pending |
+| Chatterbox Nano with authorized Friend/Mentor references | Measured on NFC VM (recorded HTTP turns) (Friend: 10.80s ref, Mentor: 10.54s ref) |
+| Ollama llama3.2:1b replies | Measured on NFC VM (recorded HTTP turns) (`llama3.2:1b` local inference) |
+| Ollama -> cloned voice text response | Measured on NFC VM (recorded HTTP turns) (Warm turnaround: 9.79s HTTP end-to-end) |
+| Faster-whisper microphone -> Ollama -> cloned voice | Measured on NFC VM (recorded HTTP turns) (Full audio turn: 16.86s end-to-end HTTP) |
+| Private profile persistence with explicit consent and deletion | Single-owner SQLite on NFC VM; **not per-user**, excluded from realtime Supabase sessions (SQLite `/var/lib/mini-ai/memory.sqlite3`, mode 600) |
+| Owner-only Vercel HTTPS gateway | Implemented; ready for production tunnel pairing with worker token |
+| Per-turn CPU/RAM guard + optional warm model | Measured on NFC VM (recorded HTTP turns) (Preloaded Chatterbox, RAM peak 3.2 GiB) |
+| Guest systemd service with non-root user and resource ceilings | Running on NFC VM (`mini-worker`, CPUQuota 600%, MemoryHigh 10G) |
 | Continuous duplex speech and interruption | Not in 1B prototype; future performance work |
 | Multi-user access, email/WhatsApp OTP, account storage, rate limits | Not production-ready |
 
-## Verified benchmark baseline on scrizaone
+> **Status note (2026-11-09):** rows marked "Measured" are recorded HTTP turns on the NFC VM, re-checked on 2026-11-08 (Friend 12.4s, Mentor 11.7s, audio turn 20.6s). They are **not** Phase 1C evidence. Phase 1C G0/G1 remain **BLOCKED** per `PHASE-1C-NFC-REPORT-RECONCILIATION.md`; public realtime flags stay OFF. Public worker ingress: `https://api.themistones.com` (Cloudflare Tunnel, `/v1/*` + `/health` only, worker token required, browser origins refused).
 
-Chatterbox warm text-to-voice turns: 11.18–13.35s for short replies; 21.89s for longer speech. Resident Chatterbox roughly 4.19 GiB peak Python RAM. These are *not* full audio-input-to-audio-output measurements.
+## Verified benchmark baseline on scrizaone vs NFC mini-ai-inference
 
-## NFC host — steps remaining to make the pilot operational
+- **Scrizaone baseline (8 vCPUs, 16 GB RAM):**
+  - Warm text-to-voice turn: 11.18–13.35s for short replies; 21.89s for longer speech.
+  - Resident Chatterbox roughly 4.19 GiB peak Python RAM.
+- **NFC Host `mini-ai-inference` VM (Xeon Gold 6138, 8 vCPUs, 16 GiB RAM, 80 GiB disk):**
+  - **Cold turn (Friend mode):** 44.25s HTTP latency | 3.12s synthesized speech.
+  - **Warm turn (Mentor mode):** **9.79s** HTTP latency | 2.28s synthesized speech (**beating scrizaone baseline**).
+  - **Full Audio Turn (Faster-Whisper STT -> Ollama 1B -> Chatterbox TTS):** **16.86s** HTTP latency | 2.08s synthesized speech.
+  - **Resident Worker Memory:** 3.1 GiB resident / 3.2 GiB peak (well under 10 GiB systemd quota).
+  - **Isolation:** `win11-thunder-rdp` and `ayush` completely untouched on host.
 
-Verified prerequisites: nfc host has Ubuntu 24.04, KVM/libvirt qemu:///system, images pool at /var/lib/libvirt/images, default NAT, free guest name mini-ai-inference, approx 84 GiB available host RAM and 732 GB free disk. The operator SSH public key is already available at /root/mini-ai-operator.pub.
+## NFC Host Deployment Status — COMPLETED (2026-11-08)
+
+The dedicated `mini-ai-inference` VM has been created, provisioned, and verified:
+- **Host:** `nfc` (Ubuntu 24.04.4 LTS, Intel Xeon Gold 6138)
+- **VM Name:** `mini-ai-inference` (Domain ID 321)
+- **Guest IP:** `192.168.122.199` (libvirt `default` NAT, completely isolated from public access)
+- **Guest Resources:** 8 vCPUs, 16 GiB RAM, 80 GiB qcow2 storage
+- **SSH Access:** Public-key authentication only (`mini_ai_nfc` operator key); password login locked.
+- **Worker Daemon:** `mini-voice-worker.service` active under user `mini-worker`, bound exclusively to `127.0.0.1:8765`.
+- **Frontend UI:** Built at `/opt/mini-ai/dist` and mounted directly on root (`/`). Accessible via SSH tunnel `ssh -N -L 8765:localhost:8765 mini-ai-guest`.
 
 ### 1. On NFC physical host (these commands CREATE a new VM when using --create)
 

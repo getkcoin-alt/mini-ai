@@ -5,7 +5,8 @@
  * Binary gateway -> client: mono signed PCM16 LE, 24 kHz, up to 80ms.
  * Text is JSON. Binary downlink MUST be preceded by response.audio.start with
  * a response_id and followed by response.audio.end; no interleaved responses.
- * User-bound JWT is sent only as the first WSS frame, never in a URL/query.
+ * User-bound JWT and the single-use ticket are sent only in the first WSS
+ * frame (session.start), never in a URL/query.
  */
 export const MINI_REALTIME_PROTOCOL = 'mini.realtime.v1';
 export const MINI_INPUT_RATE = 16000;
@@ -24,6 +25,17 @@ export function miniSameOriginWs(locationLike) {
   if (protocol !== 'https:' && hostname !== 'localhost' && hostname !== '127.0.0.1')
     throw new Error('Mini voice needs HTTPS outside localhost.');
   return (protocol === 'https:' ? 'wss://' : 'ws://') + host + MINI_WS_PATH;
+}
+
+/** Live voice connects to the private worker URL the server returned.
+ * Only wss:// to a /v1/realtime/browser path is accepted. */
+export function miniLiveWsUrl(value) {
+  if (typeof value !== 'string' || value.length > 300) return '';
+  try {
+    const url = new URL(value);
+    return url.protocol === 'wss:' && url.pathname === '/v1/realtime/browser' && !url.search && !url.hash
+      && !url.username && !url.password ? url.href : '';
+  } catch { return ''; }
 }
 
 export function miniTextEvent(data) {
