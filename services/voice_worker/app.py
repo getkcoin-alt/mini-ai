@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import asyncio
 import os
 import logging
 from contextlib import asynccontextmanager
@@ -46,6 +47,27 @@ async def lifespan(_app: FastAPI):
             logger.info("Chatterbox loaded and conditioned on Mini's voice once")
         except (resource_limits.VoiceMemoryLow, resource_limits.VoiceBusy, Exception) as exc:
             logger.warning("Optional voice prewarm unavailable; running cold: %s", exc)
+    if os.environ.get("MINI_STREAMING_TTS", "0") == "1" and os.environ.get("MINI_T3_PROCESS", "1") == "1":
+        try:
+            from . import streaming_tts
+            await asyncio.get_running_loop().run_in_executor(None, streaming_tts.ensure_t3_server)
+        except Exception as exc:
+            logger.warning("Speech-token process unavailable; streaming will start it on demand: %s", exc)
+    if os.environ.get("MINI_PRELOAD_LLM", "1") == "1":
+        # Load the Ollama model now so the first live turn is not a cold start.
+        try:
+            import httpx
+            url = (os.environ.get("MINI_OLLAMA_URL") or "http://127.0.0.1:11434").rstrip("/")
+            if url.startswith(("http://127.0.0.1:", "http://localhost:")):
+                async with httpx.AsyncClient(timeout=120, trust_env=False) as client:
+                    await client.post(url + "/api/generate", json={
+                        "model": os.environ.get("MINI_OLLAMA_MODEL", "llama3.2:1b"), "prompt": "",
+                        "keep_alive": engine.ollama_keep_alive(),
+                        # Same runner options as live turns, or Ollama reloads the model.
+                        "options": {"num_ctx": 2048, "num_thread": engine.llm_threads()}})
+                logger.info("Ollama model preloaded")
+        except Exception as exc:
+            logger.warning("Ollama preload unavailable: %s", exc)
     yield
 
 

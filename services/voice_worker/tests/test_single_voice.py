@@ -4,6 +4,7 @@ import sys
 import tempfile
 import types
 import unittest
+import unittest.mock
 from pathlib import Path
 
 try:
@@ -51,3 +52,11 @@ class SingleVoiceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class OllamaKeepAliveTests(unittest.TestCase):
+    def test_numbers_become_integers_and_durations_stay_strings(self):
+        from services.voice_worker import engine
+        for raw, expected in [("30m", "30m"), ("-1", -1), ("0", 0), (" 5m ", "5m")]:
+            with unittest.mock.patch.dict(os.environ, {"MINI_OLLAMA_KEEP_ALIVE": raw}):
+                self.assertEqual(engine.ollama_keep_alive(), expected)

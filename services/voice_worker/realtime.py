@@ -463,7 +463,7 @@ class MiniRealtimeSession:
                     "model": os.environ.get("MINI_OLLAMA_MODEL", "llama3.2:1b"),
                     "messages": messages,
                     "stream": True,
-                    "keep_alive": os.environ.get("MINI_OLLAMA_KEEP_ALIVE", "30m"),
+                    "keep_alive": engine.ollama_keep_alive(),
                     "options": {"num_predict": 100, "temperature": 0.6, "num_ctx": 2048,
                                 "num_thread": engine.llm_threads()},
                 }) as stream_resp:
@@ -520,24 +520,68 @@ class MiniRealtimeSession:
             if clause is None or response_id in self.cancelled_response_ids:
                 break
             t_clause = time.perf_counter()
-            samples, _rate = await loop.run_in_executor(None, engine.synthesize_samples, clause[:300], "en")
-            logger.info("TTS clause %.0f ms for %.1f s audio (queued at +%.0f ms): %r",
-                        (time.perf_counter() - t_clause) * 1000, len(samples) / _rate,
-                        (t_clause - t_start) * 1000, clause[:60])
-            if response_id in self.cancelled_response_ids:
-                break
-            pcm_bytes = (np.clip(samples, -1.0, 1.0) * 32767).astype("<i2").tobytes()
-            if not started:
-                started = True
-                self.reply_audio_started = True
-                timing["first_audio_ms"] = round((time.perf_counter() - t_start) * 1000)
-                await self.send_json({"type": "response.audio.start", "response_id": response_id, "stream_id": stream_id})
-            for offset in range(0, len(pcm_bytes), MAX_OUTPUT_CHUNK_BYTES):
+            audio_s = 0.0
+            async for samples in self._clause_audio(clause[:300], response_id):
                 if response_id in self.cancelled_response_ids:
                     return
-                await self.send_audio_chunk(stream_id, pcm_bytes[offset:offset + MAX_OUTPUT_CHUNK_BYTES])
+                audio_s += len(samples) / OUTPUT_RATE
+                pcm_bytes = (np.clip(samples, -1.0, 1.0) * 32767).astype("<i2").tobytes()
+                if not started:
+                    started = True
+                    self.reply_audio_started = True
+                    timing["first_audio_ms"] = round((time.perf_counter() - t_start) * 1000)
+                    await self.send_json({"type": "response.audio.start", "response_id": response_id, "stream_id": stream_id})
+                for offset in range(0, len(pcm_bytes), MAX_OUTPUT_CHUNK_BYTES):
+                    if response_id in self.cancelled_response_ids:
+                        return
+                    await self.send_audio_chunk(stream_id, pcm_bytes[offset:offset + MAX_OUTPUT_CHUNK_BYTES])
+            logger.info("TTS clause %.0f ms for %.1f s audio (queued at +%.0f ms): %r",
+                        (time.perf_counter() - t_clause) * 1000, audio_s, (t_clause - t_start) * 1000, clause[:60])
         if started and response_id not in self.cancelled_response_ids:
             await self.send_json({"type": "response.audio.end", "response_id": response_id})
+
+    async def _clause_audio(self, clause: str, response_id: str):
+        """Yield float32 24 kHz chunks for one clause in Mini's voice.
+
+        With MINI_STREAMING_TTS=1 audio streams while the clause is
+        still being generated (see streaming_tts); otherwise the whole clause
+        is synthesized first.
+        """
+        loop = asyncio.get_running_loop()
+        if os.environ.get("MINI_STREAMING_TTS", "0") != "1":
+            samples, _rate = await loop.run_in_executor(None, engine.synthesize_samples, clause, "en")
+            yield samples
+            return
+        from . import streaming_tts
+        chunks: asyncio.Queue = asyncio.Queue()
+        stopped = {"value": False}
+
+        def cancelled() -> bool:
+            return stopped["value"] or self.closed or response_id in self.cancelled_response_ids
+
+        def produce():
+            try:
+                with engine.MODEL_LOCK:
+                    model = engine._conditioned_tts("en")
+                    for chunk in streaming_tts.stream_speech(model, clause, cancelled=cancelled):
+                        loop.call_soon_threadsafe(chunks.put_nowait, chunk)
+            except BaseException as exc:  # handed to the event loop below
+                loop.call_soon_threadsafe(chunks.put_nowait, exc)
+            finally:
+                loop.call_soon_threadsafe(chunks.put_nowait, None)
+
+        worker = loop.run_in_executor(None, produce)
+        try:
+            while True:
+                item = await chunks.get()
+                if item is None:
+                    break
+                if isinstance(item, BaseException):
+                    raise item
+                yield item
+        finally:
+            stopped["value"] = True
+            await asyncio.shield(worker)
 
     def cleanup(self):
         self.closed = True
