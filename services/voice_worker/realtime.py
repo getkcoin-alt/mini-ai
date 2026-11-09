@@ -25,7 +25,7 @@ import numpy as np
 import torch
 from fastapi import WebSocket, WebSocketDisconnect
 
-from . import engine, memory, resource_limits, ws_auth
+from . import admission, engine, memory, resource_limits, ws_auth
 
 logger = logging.getLogger("mini.realtime")
 
@@ -115,6 +115,35 @@ def split_clause(buffer: str, *, first: bool) -> tuple[str, str] | None:
     return None
 
 
+async def fetch_user_context(access_token: str, user_id: str) -> list[str]:
+    """This user's own profile and memories, read with THEIR token (RLS)."""
+    supabase_url = os.environ.get("MINI_SUPABASE_URL", "https://gkdaxtnlwojggdqitsex.supabase.co").rstrip("/")
+    key = os.environ.get("MINI_SUPABASE_PUBLISHABLE_KEY", "")
+    if not key or not access_token:
+        return []
+    headers = {"Authorization": f"Bearer {access_token}", "apikey": key}
+    facts: list[str] = []
+    try:
+        async with httpx.AsyncClient(timeout=5.0, trust_env=False) as client:
+            prof = await client.get(f"{supabase_url}/rest/v1/mini_profiles", headers=headers, params={
+                "select": "display_name,mini_name,companion_mode,tone,focus,boundaries",
+                "user_id": f"eq.{user_id}", "limit": "1"})
+            mems = await client.get(f"{supabase_url}/rest/v1/mini_memories", headers=headers, params={
+                "select": "kind,content", "user_id": f"eq.{user_id}",
+                "or": "(expires_at.is.null,expires_at.gt.now())",
+                "order": "updated_at.desc", "limit": "20"})
+        if prof.status_code == 200 and prof.json():
+            row = prof.json()[0]
+            labels = {"display_name": "Call the user", "mini_name": "Your name is", "companion_mode": "Preferred mode",
+                      "tone": "Preferred tone", "focus": "Current focus", "boundaries": "Boundaries to respect"}
+            facts += [f"{labels[k]}: {str(v)[:300]}" for k, v in row.items() if k in labels and v]
+        if mems.status_code == 200:
+            facts += [f"{m.get('kind', 'fact')}: {str(m.get('content', ''))[:300]}" for m in mems.json() if m.get("content")]
+    except Exception as exc:
+        logger.warning("Could not load user context: %s", type(exc).__name__)
+    return facts[:30]
+
+
 class SileroVADDetector:
     def __init__(self, model):
         self.model = model
@@ -194,17 +223,24 @@ class MiniRealtimeSession:
         self.conversation_history: list[dict] = []
         self.unanswered_transcript = ""
         self.reply_audio_started = False
+        self.client_ip = ""
+        self.profile_facts: list[str] = []
+        self.admission_task: asyncio.Task | None = None
+        self.watchdog_task: asyncio.Task | None = None
+        self.holds_floor = False
+        self.ready_at: float | None = None
+        self.last_activity = time.monotonic()
+        self.usage_recorded = False
 
     def owner_profile_facts(self) -> list[str]:
-        """Profile facts allowed in this session's prompt.
+        """Facts allowed in this session's prompt.
 
-        The SQLite profile is the single-owner pilot store, not per-account
-        memory. It is used ONLY for the loopback owner session; verified
-        Supabase accounts get no shared profile until per-user, RLS-scoped
-        memory is wired to the worker.
+        Supabase accounts get ONLY their own profile and memories (loaded at
+        session.start with their token, so row-level security applies). The
+        SQLite single-owner profile is used only for the loopback dev session.
         """
         if self.user_id != "local-dev-owner":
-            return []
+            return list(self.profile_facts)
         profile_data = memory.get_profile()
         if not (profile_data.get("saved") and profile_data.get("profile")):
             return []
@@ -278,11 +314,15 @@ class MiniRealtimeSession:
                 await self.ws.close(code=4401, reason="Unauthorized")
                 return
 
+            if self.user_id or self.admission_task:
+                return  # session.start only once per connection
             self.user_id = user["id"]
             self.mode = "mentor" if event.get("mode") == "mentor" else "friend"
-            self.is_ready = True
-            await self.send_json({"type": "session.ready"})
-            logger.info("Session ready for user %s in %s mode", self.user_id, self.mode)
+            if not await self.check_limits():
+                return
+            if self.user_id != "local-dev-owner":
+                self.profile_facts = await fetch_user_context(access_token, self.user_id)
+            self.admission_task = asyncio.create_task(self.wait_for_floor())
 
         elif event_type == "playback.progress":
             resp_id = event.get("response_id")
@@ -297,6 +337,78 @@ class MiniRealtimeSession:
         elif event_type == "session.end":
             self.cleanup()
             await self.ws.close(code=1000, reason="Session ended by client")
+
+    async def end_session(self, reason: str, message: str, code: int = 1000):
+        await self.send_json({"type": "session.ending", "reason": reason, "message": message})
+        self.cleanup()
+        try:
+            await self.ws.close(code=code, reason=reason[:60])
+        except Exception:
+            pass
+
+    async def check_limits(self) -> bool:
+        """Start-rate and daily allowance; the dev loopback owner is exempt."""
+        if self.user_id == "local-dev-owner":
+            return True
+        if not admission.STARTS.allow(self.user_id, limit=6, window_s=60):
+            await self.end_session("rate_limited", "Too many attempts. Please wait a minute and try again.", 4429)
+            return False
+        if admission.USAGE.remaining(self.user_id) < 15:
+            minutes = admission.daily_seconds() // 60
+            await self.end_session("daily_limit", f"You've used today's {minutes} minutes with Mini. "
+                                   "Come back tomorrow!", 4429)
+            return False
+        return True
+
+    async def wait_for_floor(self):
+        async def report(position: int):
+            await self.send_json({"type": "session.queued", "position": position,
+                                  "message": "Mini is talking with someone else. You're next in line."
+                                  if position == 1 else f"Mini is busy. You're number {position} in line."})
+        try:
+            if not await admission.FLOOR.acquire(self.session_id, report):
+                await self.end_session("queue_full", "Mini is very busy right now. Please try again in a few minutes.", 4429)
+                return
+            self.holds_floor = True
+            if self.closed:
+                admission.FLOOR.release(self.session_id)
+                return
+            self.ready_at = time.monotonic()
+            self.last_activity = self.ready_at
+            self.is_ready = True
+            limits = {"max_seconds": admission.max_session_seconds(), "idle_seconds": admission.idle_seconds()}
+            if self.user_id != "local-dev-owner":
+                limits["remaining_today_seconds"] = int(admission.USAGE.remaining(self.user_id))
+            await self.send_json({"type": "session.ready", "limits": limits})
+            self.watchdog_task = asyncio.create_task(self.watchdog())
+            logger.info("Session %s ready in %s mode (queue now %d)", self.session_id, self.mode,
+                        admission.FLOOR.waiting)
+        except asyncio.CancelledError:
+            pass
+
+    def busy_speaking(self) -> bool:
+        return bool(self.current_response_id) or bool(self.vad_detector and self.vad_detector.is_speech_active)
+
+    async def watchdog(self):
+        try:
+            while not self.closed:
+                await asyncio.sleep(1)
+                now = time.monotonic()
+                if self.busy_speaking():
+                    self.last_activity = now
+                elapsed = now - (self.ready_at or now)
+                if elapsed >= admission.max_session_seconds():
+                    await self.end_session("time_limit", "That's our time for this conversation. Start a new one anytime!")
+                    return
+                if now - self.last_activity >= admission.idle_seconds():
+                    await self.end_session("idle", "I'll hang up for now since it's quiet. Tap to talk again anytime.")
+                    return
+                if (self.user_id != "local-dev-owner"
+                        and elapsed >= admission.USAGE.remaining(self.user_id)):
+                    await self.end_session("daily_limit", "You've used today's time with Mini. Come back tomorrow!")
+                    return
+        except asyncio.CancelledError:
+            pass
 
     async def handle_audio_frame(self, frame_bytes: bytes):
         if not self.is_ready or self.closed:
@@ -500,6 +612,11 @@ class MiniRealtimeSession:
                             break
             if buffer.strip() and response_id not in self.cancelled_response_ids:
                 clauses.put_nowait(buffer.strip())
+            extra = engine.crisis_followup(user_transcript, "".join(full_reply))
+            if extra and response_id not in self.cancelled_response_ids:
+                full_reply.append(" " + extra)
+                await self.send_json({"type": "response.text.delta", "response_id": response_id, "text": " " + extra})
+                clauses.put_nowait(extra)
         finally:
             clauses.put_nowait(None)
             if response_id in self.cancelled_response_ids:
@@ -592,6 +709,19 @@ class MiniRealtimeSession:
             await asyncio.shield(worker)
 
     def cleanup(self):
+        if self.admission_task and not self.admission_task.done():
+            self.admission_task.cancel()
+        if self.watchdog_task and not self.watchdog_task.done() and self.watchdog_task is not asyncio.current_task():
+            self.watchdog_task.cancel()
+        if self.holds_floor:
+            self.holds_floor = False
+            admission.FLOOR.release(self.session_id)
+        if self.ready_at and not self.usage_recorded and self.user_id and self.user_id != "local-dev-owner":
+            self.usage_recorded = True
+            try:
+                admission.USAGE.add(self.user_id, time.monotonic() - self.ready_at)
+            except Exception as exc:
+                logger.warning("Could not record usage: %s", exc)
         self.closed = True
         if self.response_task and not self.response_task.done():
             self.response_task.cancel()

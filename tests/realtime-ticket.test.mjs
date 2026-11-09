@@ -4,7 +4,7 @@ import { createHmac } from 'node:crypto';
 import handler, { issueRealtimeTicket } from '../api/voice/realtime-config.js';
 import { miniLiveWsUrl } from '../mini-realtime-protocol.js';
 
-const KEYS = ['MINI_WORKER_TOKEN', 'MINI_OWNER_EMAIL', 'MINI_SUPABASE_URL', 'MINI_SUPABASE_PUBLISHABLE_KEY',
+const KEYS = ['MINI_REALTIME_AUDIENCE', 'MINI_REQUIRE_AGE_CONFIRMATION', 'MINI_WORKER_TOKEN', 'MINI_OWNER_EMAIL', 'MINI_SUPABASE_URL', 'MINI_SUPABASE_PUBLISHABLE_KEY',
   'MINI_REALTIME_ENABLED', 'MINI_REALTIME_GATEWAY_READY', 'MINI_REALTIME_WS_URL'];
 const saved = Object.fromEntries(KEYS.map((k) => [k, process.env[k]]));
 const realFetch = globalThis.fetch;
@@ -52,4 +52,25 @@ test('live URL must be a plain wss worker browser path', () => {
   for (const bad of ['ws://api.example.com/v1/realtime/browser', 'wss://api.example.com/v1/realtime',
     'wss://api.example.com/v1/realtime/browser?token=x', 'wss://u:p@api.example.com/v1/realtime/browser', '', null, 'javascript:alert(1)'])
     assert.equal(miniLiveWsUrl(bad), '', String(bad));
+});
+
+test('audience=all lets any confirmed account in; unconfirmed email never', async () => {
+  env(); process.env.MINI_REALTIME_AUDIENCE = 'all'; delete process.env.MINI_REQUIRE_AGE_CONFIRMATION;
+  supaUser({ id: 'u9', email: 'friend@example.com', email_confirmed_at: '2026-11-10' });
+  let res = await call(); assert.equal(res.body.enabled, true); assert.ok(res.body.ticket);
+  supaUser({ id: 'u9', email: 'friend@example.com', email_confirmed_at: null });
+  res = await call(); assert.equal(res.body.enabled, false); assert.equal(res.body.reason, 'email_unconfirmed');
+  delete process.env.MINI_REALTIME_AUDIENCE;
+});
+
+test('18+ gate reads the user profile when required', async () => {
+  env(); process.env.MINI_REALTIME_AUDIENCE = 'all'; process.env.MINI_REQUIRE_AGE_CONFIRMATION = 'true';
+  const user = { id: 'u7', email: 'a@example.com', email_confirmed_at: '2026-11-10' };
+  for (const [rows, enabled] of [[[{ age_confirmed_at: '2026-11-10' }], true], [[{ age_confirmed_at: null }], false], [[], false]]) {
+    globalThis.fetch = async (url) => new Response(JSON.stringify(String(url).includes('/rest/v1/') ? rows : user), { status: 200 });
+    const res = await call();
+    assert.equal(res.body.enabled, enabled, JSON.stringify(rows));
+    if (!enabled) assert.equal(res.body.reason, 'age_confirmation_required');
+  }
+  delete process.env.MINI_REALTIME_AUDIENCE; delete process.env.MINI_REQUIRE_AGE_CONFIRMATION;
 });

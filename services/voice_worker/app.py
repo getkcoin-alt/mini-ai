@@ -366,7 +366,16 @@ async def browser_realtime_ws(websocket: WebSocket):
     if not ws_auth.realtime_origin_allowed(websocket.headers.get("origin")):
         await websocket.close(code=1008, reason="Origin not allowed")
         return
-    await _run_realtime(websocket, allow_local_dev=False, require_ticket=True)
+    from . import admission
+    # Cloudflare Tunnel puts the real client address in CF-Connecting-IP.
+    ip = (websocket.headers.get("cf-connecting-ip") or (websocket.client.host if websocket.client else "")).strip()[:64]
+    if not admission.CONNECTIONS.try_open(ip, int(os.environ.get("MINI_MAX_CONNECTIONS_PER_IP") or 3)):
+        await websocket.close(code=1008, reason="Too many connections")
+        return
+    try:
+        await _run_realtime(websocket, allow_local_dev=False, require_ticket=True)
+    finally:
+        admission.CONNECTIONS.close(ip)
 
 
 @app.websocket("/api/voice/realtime")

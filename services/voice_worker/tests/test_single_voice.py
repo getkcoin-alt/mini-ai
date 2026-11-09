@@ -60,3 +60,25 @@ class OllamaKeepAliveTests(unittest.TestCase):
         for raw, expected in [("30m", "30m"), ("-1", -1), ("0", 0), (" 5m ", "5m")]:
             with unittest.mock.patch.dict(os.environ, {"MINI_OLLAMA_KEEP_ALIVE": raw}):
                 self.assertEqual(engine.ollama_keep_alive(), expected)
+
+
+class SafetyPromptTests(unittest.TestCase):
+    def test_every_mode_has_safety_rules_and_helpline(self):
+        from services.voice_worker import engine
+        for mode, text in engine.PROMPTS.items():
+            self.assertIn("14416", text, mode)
+            self.assertIn("not a doctor", text, mode)
+
+
+class CrisisFollowupTests(unittest.TestCase):
+    def test_self_harm_mentions_always_get_the_helpline(self):
+        from services.voice_worker import engine
+        for text in ["I want to hurt myself", "sometimes I think about suicide", "I don't want to live anymore",
+                     "i wanna die", "I've been self-harming"]:
+            self.assertIn("14416", engine.crisis_followup(text, "I'm here for you."), text)
+
+    def test_not_added_when_already_said_or_unrelated(self):
+        from services.voice_worker import engine
+        self.assertIsNone(engine.crisis_followup("I want to hurt myself", "Please call 14416 now."))
+        for text in ["this traffic is killing me", "I could die laughing", "what should I cook", "my phone died"]:
+            self.assertIsNone(engine.crisis_followup(text, "ok"), text)

@@ -20,6 +20,18 @@ export function issueRealtimeTicket(sub, { secret = process.env.MINI_WORKER_TOKE
   return payload + '.' + sig;
 }
 
+/** 18+ confirmation saved on the user's own profile (read with their token, RLS). */
+async function ageConfirmed(url, key, token, userId) {
+  try {
+    const r = await fetch(url + '/rest/v1/mini_profiles?select=age_confirmed_at&user_id=eq.' + encodeURIComponent(userId), {
+      headers: { apikey: key, Authorization: 'Bearer ' + token }, signal: AbortSignal.timeout(5000)
+    });
+    if (!r.ok) return false;
+    const rows = await r.json();
+    return Boolean(rows?.[0]?.age_confirmed_at);
+  } catch { return false; }
+}
+
 function liveWsUrl() {
   const url = process.env.MINI_REALTIME_WS_URL || '';
   return /^wss:\/\/[a-z0-9.-]+(:\d+)?\/v1\/realtime\/browser$/.test(url) ? url : '';
@@ -27,7 +39,7 @@ function liveWsUrl() {
 
 /**
  * Readiness + ticket for live voice. Vercel functions cannot hold WebSockets,
- * so the signed-in owner's browser connects directly to the private worker
+ * so the signed-in user's browser connects directly to the private worker
  * (MINI_REALTIME_WS_URL) with a 60-second, single-use ticket. The worker also
  * re-verifies the Supabase session and requires both to name the same user.
  * Fail-closed unless MINI_REALTIME_ENABLED and MINI_REALTIME_GATEWAY_READY are true.
@@ -61,7 +73,13 @@ export default async function handler(req, res) {
   const wsUrl = liveWsUrl();
   if (!flagsOn || !wsUrl || (process.env.MINI_WORKER_TOKEN || '').length < 32)
     return res.status(200).json({ enabled: false, ...base, reason: 'nfc_gateway_not_ready' });
-  const owner = String(user.email || '').toLowerCase() === ownerEmail() && Boolean(user.email_confirmed_at);
-  if (!owner) return res.status(200).json({ enabled: false, ...base, reason: 'owner_only' });
+  // Who may talk live: MINI_REALTIME_AUDIENCE=owner (default) or all. Either
+  // way the account's email must be confirmed.
+  if (!user.email_confirmed_at) return res.status(200).json({ enabled: false, ...base, reason: 'email_unconfirmed' });
+  const everyone = process.env.MINI_REALTIME_AUDIENCE === 'all';
+  if (!everyone && String(user.email || '').toLowerCase() !== ownerEmail())
+    return res.status(200).json({ enabled: false, ...base, reason: 'owner_only' });
+  if (process.env.MINI_REQUIRE_AGE_CONFIRMATION === 'true' && !(await ageConfirmed(url, key, token, user.id)))
+    return res.status(200).json({ enabled: false, ...base, reason: 'age_confirmation_required' });
   return res.status(200).json({ enabled: true, ...base, wsUrl, ticket: issueRealtimeTicket(user.id) });
 }

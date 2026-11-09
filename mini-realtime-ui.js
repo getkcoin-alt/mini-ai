@@ -79,6 +79,12 @@ export function createMiniRealtimeUI({getMode, onNotice=()=>{}}) {
       if(ready) {
         setBadge('Secure gateway ready','live');
         explain('Tap Start and just talk. Mini listens, answers in its own voice, and you can interrupt it anytime.');
+      } else if(dataReady.reason==='email_unconfirmed') {
+        setBadge('Confirm email');
+        explain('Confirm your email address to talk with Mini.');
+      } else if(dataReady.reason==='age_confirmation_required') {
+        setBadge('18+ only');
+        explain('Mini is for adults. Confirm you are 18 or older in your profile to talk.');
       } else if(dataReady.reason==='owner_only') {
         setBadge('Owner only');
         explain('Live conversation is limited to the owner account for now.');
@@ -134,6 +140,14 @@ export function createMiniRealtimeUI({getMode, onNotice=()=>{}}) {
       case 'ui.interrupted':
         setBadge('Interrupted','busy');
         explain('Playback stopped. Mini is dropping unheard audio and updating context.');
+        break;
+      case 'ui.queued':
+        setBadge(event.position>1?'In line #'+event.position:'You\'re next','busy');
+        explain(event.message||'Mini is talking with someone else. You\'ll be connected automatically.');
+        break;
+      case 'ui.ending':
+        explain(event.message||'Conversation ended.');
+        if(event.message) onNotice(event.message);
         break;
       case 'ui.error':
         explain(event.message);
