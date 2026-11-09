@@ -11,18 +11,17 @@ from __future__ import annotations
 
 import base64
 import binascii
-import hmac
 import os
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, WebSocket
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import engine, memory, resource_limits
+from . import engine, memory, resource_limits, ws_auth
 
 logger = logging.getLogger("mini.voice")
 
@@ -42,6 +41,15 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="Mini AI Private Voice Worker", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
 MAX_BASE64_LENGTH = 4_100_000
+
+
+@app.middleware("http")
+async def refuse_browser_origins(request: Request, call_next):
+    # Public worker domain is server-to-server only (see ws_auth). Runs before
+    # body parsing and token checks, so preflights and browser calls get 403.
+    if ws_auth.browser_origin_refused(request.url.path, request.headers.get("origin")):
+        return JSONResponse(status_code=403, content={"detail": "Browser origins are not allowed on /v1."})
+    return await call_next(request)
 
 
 class AudioUpload(BaseModel):
@@ -73,27 +81,23 @@ class VoiceTurnRequest(BaseModel):
 
 
 def worker_auth(x_mini_worker_token: str | None = Header(default=None)):
-    expected = os.environ.get("MINI_WORKER_TOKEN", "")
-    if len(expected) < 32 or not x_mini_worker_token or not hmac.compare_digest(expected, x_mini_worker_token):
+    if not ws_auth.worker_token_ok(x_mini_worker_token):
         raise HTTPException(status_code=401, detail="Worker authentication required")
+
+
+def _local_error(conn) -> str | None:
+    # Works for both HTTP Request and WebSocket (both are HTTPConnection).
+    return ws_auth.local_connection_error(
+        conn.client.host if conn.client else "", conn.url.hostname or "", conn.url.port,
+        conn.headers.get("origin"))
 
 
 def local_auth(request: Request):
     # A reverse-proxy exposing this app publicly would be unsafe: intentionally
     # require direct localhost requests for uncredentialed local UI alias paths.
-    host = request.client.host if request.client else ""
-    requested_host = (request.url.hostname or "").lower()
-    if host not in ("127.0.0.1", "::1") or requested_host not in ("127.0.0.1", "localhost", "::1"):
-        raise HTTPException(status_code=403, detail="This preview endpoint is localhost-only.")
-    origin = request.headers.get("origin")
-    if origin:
-        try:
-            from urllib.parse import urlsplit
-            parsed = urlsplit(origin)
-            if parsed.scheme != "http" or parsed.hostname != requested_host or parsed.port != request.url.port:
-                raise HTTPException(status_code=403, detail="Cross-origin access denied.")
-        except ValueError:
-            raise HTTPException(status_code=403, detail="Invalid request origin.")
+    error = _local_error(request)
+    if error:
+        raise HTTPException(status_code=403, detail=error)
 
 
 def read_audio(value: str) -> bytes:
@@ -305,6 +309,32 @@ def preview_turn(data: VoiceTurnRequest):
 @app.get("/health")
 def health():
     return {"service": "mini-private-local-voice", "status": "up"}
+
+
+async def _run_realtime(websocket: WebSocket, *, allow_local_dev: bool):
+    from . import realtime
+    session = realtime.MiniRealtimeSession(websocket, allow_local_dev_token=allow_local_dev)
+    await session.handle_connection()
+
+
+# Authentication happens BEFORE the WebSocket handshake is accepted, so a
+# refused client never reaches model loading. Closing before accept() makes
+# the server reject the upgrade (HTTP 403).
+@app.websocket("/v1/realtime")
+async def protected_realtime_ws(websocket: WebSocket):
+    if (ws_auth.browser_origin_refused(websocket.url.path, websocket.headers.get("origin"))
+            or not ws_auth.worker_token_ok(websocket.headers.get("x-mini-worker-token"))):
+        await websocket.close(code=1008, reason="Worker authentication required")
+        return
+    await _run_realtime(websocket, allow_local_dev=False)
+
+
+@app.websocket("/api/voice/realtime")
+async def local_realtime_ws(websocket: WebSocket):
+    if _local_error(websocket):
+        await websocket.close(code=1008, reason="Localhost only")
+        return
+    await _run_realtime(websocket, allow_local_dev=True)
 
 
 DIST = Path(__file__).resolve().parents[2] / "dist"

@@ -15,8 +15,8 @@ for cmd in virsh virt-install qemu-img python3 curl sha256sum; do
   command -v "$cmd" >/dev/null || { echo "MISSING TOOL: $cmd" >&2; exit 1; }
 done
 [[ "$(virsh uri)" == qemu:///system ]] || { echo "BLOCKED: unexpected libvirt URI" >&2; exit 1; }
-virsh pool-info "$pool" | grep -Eq '^State:[[:space:]]+running$' || { echo "BLOCKED: images pool inactive"; exit 1; }
-virsh net-info default | grep -Eq '^Active:[[:space:]]+yes$' || { echo "BLOCKED: default NAT inactive"; exit 1; }
+virsh pool-info "$pool" | grep -E '^State:[[:space:]]+running$' >/dev/null || { echo "BLOCKED: images pool inactive"; exit 1; }
+virsh net-info default | grep -E '^Active:[[:space:]]+yes$' >/dev/null || { echo "BLOCKED: default NAT inactive"; exit 1; }
 pool_dir="$(virsh pool-dumpxml "$pool" | python3 -c 'import sys,xml.etree.ElementTree as ET; print(ET.parse(sys.stdin).findtext("./target/path") or "")')"
 [[ -n "$pool_dir" && -d "$pool_dir" ]] || { echo "BLOCKED: pool directory missing"; exit 1; }
 if virsh dominfo "$vm" >/dev/null 2>&1; then echo "BLOCKED: VM name already exists"; exit 2; fi
