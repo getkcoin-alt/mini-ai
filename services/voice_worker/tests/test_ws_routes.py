@@ -27,12 +27,15 @@ class RealtimeRouteAuthTests(unittest.TestCase):
         stub = types.ModuleType("services.voice_worker.realtime")
 
         class StubSession:
-            def __init__(self, websocket, allow_local_dev_token=False):
-                self.ws, self.allow = websocket, allow_local_dev_token
+            def __init__(self, websocket, allow_local_dev_token=False, require_ticket=False):
+                self.ws, self.allow, self.ticket = websocket, allow_local_dev_token, require_ticket
 
             async def handle_connection(self):
                 await self.ws.accept()
-                await self.ws.send_json({"accepted": True, "allow_local_dev": self.allow})
+                reply = {"accepted": True, "allow_local_dev": self.allow}
+                if self.ticket:
+                    reply["require_ticket"] = True
+                await self.ws.send_json(reply)
                 await self.ws.close()
 
         stub.MiniRealtimeSession = StubSession
@@ -94,6 +97,16 @@ class RealtimeRouteAuthTests(unittest.TestCase):
     def test_v1_realtime_refused_when_worker_token_unset(self):
         with patch.dict(os.environ, {"MINI_WORKER_TOKEN": ""}):
             self._refused(self._client(), "/v1/realtime", {"x-mini-worker-token": ""})
+
+    def test_browser_realtime_only_from_allowed_origin_and_needs_ticket(self):
+        with patch.dict(os.environ, {"MINI_REALTIME_ALLOWED_ORIGINS": "https://mini-ai-six.vercel.app"}):
+            self._refused(self._client(), "/v1/realtime/browser")
+            self._refused(self._client(), "/v1/realtime/browser", {"origin": "https://evil.example"})
+            with self._client().websocket_connect("/v1/realtime/browser",
+                                                  headers={**LOOPBACK_HOST, "origin": "https://mini-ai-six.vercel.app"}) as ws:
+                self.assertEqual(ws.receive_json(), {"accepted": True, "allow_local_dev": False, "require_ticket": True})
+        with patch.dict(os.environ, {"MINI_REALTIME_ALLOWED_ORIGINS": ""}):
+            self._refused(self._client(), "/v1/realtime/browser", {"origin": "https://mini-ai-six.vercel.app"})
 
     def test_local_realtime_is_loopback_only(self):
         self._refused(self._client(host="203.0.113.9"), "/api/voice/realtime")

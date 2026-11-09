@@ -24,6 +24,15 @@ from pydantic import BaseModel, Field
 from . import engine, memory, resource_limits, ws_auth
 
 logger = logging.getLogger("mini.voice")
+# uvicorn leaves the root logger at WARNING; keep Mini's own INFO lines
+# (per-turn latency, clause timing) visible in journald.
+_mini_log = logging.getLogger("mini")
+if not _mini_log.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(levelname)s:%(name)s: %(message)s"))
+    _mini_log.addHandler(_handler)
+    _mini_log.setLevel(logging.INFO)
+    _mini_log.propagate = False
 
 
 @asynccontextmanager

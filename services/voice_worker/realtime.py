@@ -184,6 +184,8 @@ class MiniRealtimeSession:
         self.cancelled_response_ids = set()
         self.last_played_ms = 0
         self.conversation_history: list[dict] = []
+        self.unanswered_transcript = ""
+        self.reply_audio_started = False
 
     def owner_profile_facts(self) -> list[str]:
         """Profile facts allowed in this session's prompt.
@@ -361,9 +363,24 @@ class MiniRealtimeSession:
         if not transcript or len(transcript) < 2:
             return
 
-        await self.send_json({"type": "input.transcript.final", "text": transcript})
+        # The user kept talking before Mini said anything: drop that pending
+        # answer and reply to the whole thing once (a mid-sentence pause must
+        # not create two competing turns).
+        previous = self.response_task
+        if previous and not previous.done():
+            if self.unanswered_transcript and not self.reply_audio_started:
+                transcript = (self.unanswered_transcript + " " + transcript).strip()
+            if self.current_response_id:
+                await self.interrupt_response(self.current_response_id, self.last_played_ms, reason="user_continued")
+            previous.cancel()
+            try:
+                await asyncio.wait_for(asyncio.gather(previous, return_exceptions=True), 15)
+            except asyncio.TimeoutError:
+                logger.warning("Previous response did not stop within 15 s")
 
-        # Launch response generation task
+        await self.send_json({"type": "input.transcript.final", "text": transcript})
+        self.unanswered_transcript = transcript
+        self.reply_audio_started = False
         self.response_task = asyncio.create_task(self.generate_and_stream_response(transcript))
 
     async def generate_and_stream_response(self, user_transcript: str):
@@ -373,16 +390,29 @@ class MiniRealtimeSession:
 
         await self.send_json({"type": "response.started", "response_id": response_id})
 
-        # Reserve inference slot safely
+        # Wait (briefly) for the single inference slot instead of failing the
+        # whole live session: another HTTP turn or a just-cancelled clause may
+        # still be finishing.
         try:
-            with resource_limits.reserve_inference(model_loaded=True):
+            deadline = time.monotonic() + 30
+            while True:
+                try:
+                    slot = resource_limits.reserve_inference(model_loaded=True)
+                    slot.__enter__()
+                    break
+                except resource_limits.VoiceBusy:
+                    if time.monotonic() > deadline or response_id in self.cancelled_response_ids:
+                        raise
+                    await asyncio.sleep(0.2)
+            try:
                 await self._run_llm_and_tts(response_id, user_transcript)
+            finally:
+                slot.__exit__(None, None, None)
         except resource_limits.VoiceBusy:
-            logger.warning("Voice worker busy; rejecting turn")
-            await self.send_json({
-                "type": "session.error",
-                "message": "Mini is completing another voice turn. Try again shortly.",
-            })
+            logger.warning("Voice worker busy for 30 s; skipping this turn")
+            await self.send_json({"type": "pipeline.busy", "response_id": response_id,
+                                  "message": "Mini is still finishing something. Please say that again."})
+            await self.send_json({"type": "response.cancelled", "response_id": response_id})
         except resource_limits.VoiceMemoryLow as exc:
             logger.warning("Voice memory low: %s", exc)
             await self.send_json({
@@ -489,12 +519,17 @@ class MiniRealtimeSession:
             clause = await clauses.get()
             if clause is None or response_id in self.cancelled_response_ids:
                 break
+            t_clause = time.perf_counter()
             samples, _rate = await loop.run_in_executor(None, engine.synthesize_samples, clause[:300], "en")
+            logger.info("TTS clause %.0f ms for %.1f s audio (queued at +%.0f ms): %r",
+                        (time.perf_counter() - t_clause) * 1000, len(samples) / _rate,
+                        (t_clause - t_start) * 1000, clause[:60])
             if response_id in self.cancelled_response_ids:
                 break
             pcm_bytes = (np.clip(samples, -1.0, 1.0) * 32767).astype("<i2").tobytes()
             if not started:
                 started = True
+                self.reply_audio_started = True
                 timing["first_audio_ms"] = round((time.perf_counter() - t_start) * 1000)
                 await self.send_json({"type": "response.audio.start", "response_id": response_id, "stream_id": stream_id})
             for offset in range(0, len(pcm_bytes), MAX_OUTPUT_CHUNK_BYTES):

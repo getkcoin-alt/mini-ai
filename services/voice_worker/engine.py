@@ -171,12 +171,23 @@ def _conditioned_tts(language: str):
     return model
 
 
+def _use_cpu_threads():
+    """PyTorch's CPU thread count is per calling thread; executor threads
+    (e.g. the realtime path) otherwise fall back to a single thread."""
+    wanted = os.environ.get("MINI_CPU_THREADS")
+    if wanted:
+        import torch
+        if torch.get_num_threads() != int(wanted):
+            torch.set_num_threads(int(wanted))
+
+
 def synthesize_samples(text: str, language: str = "en"):
     """Generate Mini's voice for `text`; returns (float32 numpy samples, sample rate)."""
     language = "hi" if language == "hi" else "en"
     if not isinstance(text, str) or not text.strip():
         raise ValueError("Speech text is empty.")
     with MODEL_LOCK:
+        _use_cpu_threads()
         model = _conditioned_tts(language)
         if language == "en":
             wav = model.generate(text[:600])
