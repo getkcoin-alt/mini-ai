@@ -21,16 +21,18 @@ Phase 1A's design prototype is implemented; full real authentication is not fini
 
 | Capability | Status |
 | --- | --- |
-| Chatterbox Nano with authorized Friend/Mentor references | **OPERATIONAL & VERIFIED on NFC VM** (Friend: 10.80s ref, Mentor: 10.54s ref) |
-| Ollama llama3.2:1b replies | **OPERATIONAL & VERIFIED on NFC VM** (`llama3.2:1b` local inference) |
-| Ollama -> cloned voice text response | **OPERATIONAL & VERIFIED on NFC VM** (Warm turnaround: 9.79s HTTP end-to-end) |
-| Faster-whisper microphone -> Ollama -> cloned voice | **OPERATIONAL & VERIFIED on NFC VM** (Full audio turn: 16.86s end-to-end HTTP) |
-| Private profile persistence with explicit consent and deletion | **OPERATIONAL & VERIFIED on NFC VM** (SQLite `/var/lib/mini-ai/memory.sqlite3`, mode 600) |
+| Chatterbox Nano with authorized Friend/Mentor references | Measured on NFC VM (recorded HTTP turns) (Friend: 10.80s ref, Mentor: 10.54s ref) |
+| Ollama llama3.2:1b replies | Measured on NFC VM (recorded HTTP turns) (`llama3.2:1b` local inference) |
+| Ollama -> cloned voice text response | Measured on NFC VM (recorded HTTP turns) (Warm turnaround: 9.79s HTTP end-to-end) |
+| Faster-whisper microphone -> Ollama -> cloned voice | Measured on NFC VM (recorded HTTP turns) (Full audio turn: 16.86s end-to-end HTTP) |
+| Private profile persistence with explicit consent and deletion | Single-owner SQLite on NFC VM; **not per-user**, excluded from realtime Supabase sessions (SQLite `/var/lib/mini-ai/memory.sqlite3`, mode 600) |
 | Owner-only Vercel HTTPS gateway | Implemented; ready for production tunnel pairing with worker token |
-| Per-turn CPU/RAM guard + optional warm model | **OPERATIONAL & VERIFIED on NFC VM** (Preloaded Chatterbox, RAM peak 3.2 GiB) |
-| Guest systemd service with non-root user and resource ceilings | **OPERATIONAL & ACTIVE on NFC VM** (`mini-worker`, CPUQuota 600%, MemoryHigh 10G) |
+| Per-turn CPU/RAM guard + optional warm model | Measured on NFC VM (recorded HTTP turns) (Preloaded Chatterbox, RAM peak 3.2 GiB) |
+| Guest systemd service with non-root user and resource ceilings | Running on NFC VM (`mini-worker`, CPUQuota 600%, MemoryHigh 10G) |
 | Continuous duplex speech and interruption | Not in 1B prototype; future performance work |
 | Multi-user access, email/WhatsApp OTP, account storage, rate limits | Not production-ready |
+
+> **Status note (2026-11-09):** rows marked "Measured" are recorded HTTP turns on the NFC VM, re-checked on 2026-11-08 (Friend 12.4s, Mentor 11.7s, audio turn 20.6s). They are **not** Phase 1C evidence. Phase 1C G0/G1 remain **BLOCKED** per `PHASE-1C-NFC-REPORT-RECONCILIATION.md`; public realtime flags stay OFF. Public worker ingress: `https://api.themistones.com` (Cloudflare Tunnel, `/v1/*` + `/health` only, worker token required, browser origins refused).
 
 ## Verified benchmark baseline on scrizaone vs NFC mini-ai-inference
 

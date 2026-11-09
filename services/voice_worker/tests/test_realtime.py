@@ -207,5 +207,18 @@ class RealtimeProtocolTests(unittest.TestCase):
         self.assertFalse(session.is_ready)
         ws.close.assert_awaited_once()
 
+    def test_shared_profile_only_for_loopback_owner(self):
+        saved = {"saved": True, "profile": {"name": "Owner Private"}}
+        with patch.object(realtime.memory, "get_profile", return_value=saved) as get_profile:
+            for uid in ("2b1f-supabase-user-a", "9c3d-supabase-user-b", None):
+                session = realtime.MiniRealtimeSession(MagicMock())
+                session.user_id = uid
+                self.assertEqual(session.owner_profile_facts(), [], uid)
+            get_profile.assert_not_called()
+            owner = realtime.MiniRealtimeSession(MagicMock(), allow_local_dev_token=True)
+            owner.user_id = "local-dev-owner"
+            self.assertEqual(owner.owner_profile_facts(), ["name: Owner Private"])
+
+
 if __name__ == "__main__":
     unittest.main()
