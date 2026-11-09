@@ -157,6 +157,21 @@ class MiniRealtimeSession:
         self.last_played_ms = 0
         self.conversation_history: list[dict] = []
 
+    def owner_profile_facts(self) -> list[str]:
+        """Profile facts allowed in this session's prompt.
+
+        The SQLite profile is the single-owner pilot store, not per-account
+        memory. It is used ONLY for the loopback owner session; verified
+        Supabase accounts get no shared profile until per-user, RLS-scoped
+        memory is wired to the worker.
+        """
+        if self.user_id != "local-dev-owner":
+            return []
+        profile_data = memory.get_profile()
+        if not (profile_data.get("saved") and profile_data.get("profile")):
+            return []
+        return [f"{k}: {v}" for k, v in profile_data["profile"].items() if v]
+
     async def send_json(self, data: dict):
         if not self.closed:
             try:
@@ -352,12 +367,9 @@ class MiniRealtimeSession:
     async def _run_llm_and_tts(self, response_id: str, user_transcript: str):
         # Build prompt
         system_prompt = engine.PROMPTS.get(self.mode, engine.PROMPTS["friend"])
-        profile_data = memory.get_profile()
-        if profile_data.get("saved") and profile_data.get("profile"):
-            p = profile_data["profile"]
-            details = [f"{k}: {v}" for k, v in p.items() if v]
-            if details:
-                system_prompt += "\nUser profile facts:\n" + "\n".join(details)
+        details = self.owner_profile_facts()
+        if details:
+            system_prompt += "\nUser profile facts:\n" + "\n".join(details)
 
         messages = [
             {"role": "system", "content": system_prompt},
