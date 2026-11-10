@@ -1,0 +1,177 @@
+{
+  "stage": 5,
+  "code": "mid_adulthood",
+  "title": "Mid-adulthood",
+  "min_age": 35,
+  "max_age": 49,
+  "theme": "Expansion and responsibility",
+  "persona": {
+    "voice": "A trusted, grounded friend: calm, respectful of their experience, light humour to ease the load.",
+    "pace": "Unhurried; gives them space to think out loud.",
+    "lean_into": [
+      "leading people",
+      "kids and family",
+      "health and energy",
+      "making time for themselves"
+    ],
+    "avoid": [
+      "assuming they have children or a partner",
+      "adding to their to-do list"
+    ],
+    "motivation_style": "Acknowledge how much they carry; celebrate balance, not just output.",
+    "story_style": "Stories about someone finding time for what matters while carrying a lot."
+  },
+  "focus": [
+    {
+      "item": "Career leadership",
+      "groups": [
+        14,
+        13
+      ],
+      "fields": [
+        "job_title",
+        "leadership_skills",
+        "team_relationships",
+        "management_preferences"
+      ],
+      "questions": [
+        "Do you lead people at work? What's that like?",
+        "What kind of leader do you try to be?"
+      ]
+    },
+    {
+      "item": "Business ownership",
+      "groups": [
+        14
+      ],
+      "fields": [
+        "business_ownership",
+        "business_ideas",
+        "career_risks"
+      ],
+      "questions": [
+        "Do you run your own business, or dream about it?",
+        "What's the hardest part of what you're building?"
+      ]
+    },
+    {
+      "item": "Wealth accumulation",
+      "groups": [
+        15,
+        21
+      ],
+      "fields": [
+        "wealth_building_strategy",
+        "investments",
+        "financial_goals"
+      ],
+      "sensitive": true,
+      "questions": [
+        "Is building long-term security on your mind these days?"
+      ]
+    },
+    {
+      "item": "Parenting responsibilities",
+      "groups": [
+        9,
+        28
+      ],
+      "fields": [
+        "children",
+        "parenting_experiences",
+        "dependants"
+      ],
+      "only_if_user_raises": true,
+      "questions": [
+        "Who's at home with you these days?",
+        "What's the best part of family life right now?"
+      ]
+    },
+    {
+      "item": "Family wellbeing",
+      "groups": [
+        9,
+        10
+      ],
+      "fields": [
+        "family_relationships",
+        "family_support_system",
+        "important_family_events"
+      ],
+      "questions": [
+        "How's everyone at home doing?",
+        "Who in your family do you feel closest to?"
+      ]
+    },
+    {
+      "item": "Health maintenance",
+      "groups": [
+        3,
+        2,
+        16
+      ],
+      "fields": [
+        "exercise_habits",
+        "sleep_quality",
+        "energy_levels",
+        "health_goals"
+      ],
+      "sensitive": true,
+      "questions": [
+        "How's your energy been lately?",
+        "Getting any time to move or rest these days?"
+      ]
+    },
+    {
+      "item": "Long-term investments",
+      "groups": [
+        15,
+        25
+      ],
+      "fields": [
+        "investments",
+        "risk_appetite",
+        "financial_decision_preferences"
+      ],
+      "sensitive": true,
+      "only_if_user_raises": true,
+      "questions": [
+        "When it comes to big decisions, are you careful or quick to jump in?"
+      ]
+    },
+    {
+      "item": "Mentoring",
+      "groups": [
+        10,
+        13,
+        29
+      ],
+      "fields": [
+        "mentors",
+        "lessons_learned",
+        "communication_skills"
+      ],
+      "questions": [
+        "Is there someone you're guiding or helping grow?",
+        "What's a lesson you wish you'd learned earlier?"
+      ]
+    },
+    {
+      "item": "Work-life balance",
+      "groups": [
+        16,
+        24
+      ],
+      "fields": [
+        "work_hours",
+        "rest_preferences",
+        "daily_priorities",
+        "personal_rituals"
+      ],
+      "questions": [
+        "How do you switch off after a long day?",
+        "What would give you a bit more breathing room?"
+      ]
+    }
+  ]
+}

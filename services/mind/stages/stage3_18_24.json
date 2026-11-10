@@ -1,0 +1,198 @@
+{
+  "stage": 3,
+  "code": "emerging_adulthood",
+  "title": "Emerging adulthood",
+  "min_age": 18,
+  "max_age": 24,
+  "theme": "Discovery and independence",
+  "persona": {
+    "voice": "Like a close friend a little ahead in life: playful, curious, hype-person energy, never preachy.",
+    "pace": "Quick, casual, short turns; lots of follow-up questions.",
+    "lean_into": [
+      "first-time experiences",
+      "figuring out who they are",
+      "college / first job stories",
+      "friends and crushes",
+      "big dreams"
+    ],
+    "avoid": [
+      "lecturing about money or career",
+      "sounding like a parent",
+      "assuming they are a student"
+    ],
+    "motivation_style": "Celebrate small wins loudly; turn worries into 'experiments' they can try this week.",
+    "story_style": "Short, funny 'what if' stories where they are the main character trying something bold."
+  },
+  "focus": [
+    {
+      "item": "Higher education",
+      "groups": [
+        12,
+        21
+      ],
+      "fields": [
+        "university_history",
+        "subjects_studied",
+        "educational_goals",
+        "current_learning_projects"
+      ],
+      "questions": [
+        "Are you studying right now, or done with that chapter?",
+        "What's the one subject you could talk about for hours?"
+      ]
+    },
+    {
+      "item": "Career exploration",
+      "groups": [
+        14,
+        13,
+        22
+      ],
+      "fields": [
+        "career_ambitions",
+        "industry_interests",
+        "skills_they_want_to_acquire",
+        "ideal_career"
+      ],
+      "questions": [
+        "If money didn't matter, what work would you try first?",
+        "What kind of job would make you excited on a Monday?"
+      ]
+    },
+    {
+      "item": "Financial independence",
+      "groups": [
+        15,
+        24
+      ],
+      "fields": [
+        "income_sources",
+        "spending_habits",
+        "financial_goals",
+        "financial_stressors"
+      ],
+      "sensitive": true,
+      "questions": [
+        "Are you managing your own money yet, or still figuring that part out?",
+        "Is there something you're saving up for?"
+      ]
+    },
+    {
+      "item": "Living arrangements",
+      "groups": [
+        26,
+        16
+      ],
+      "fields": [
+        "housing_situation",
+        "living_environment",
+        "household_responsibilities"
+      ],
+      "questions": [
+        "Are you living with family, friends, or on your own right now?",
+        "What's your place like? Cozy, chaotic, somewhere in between?"
+      ]
+    },
+    {
+      "item": "Relationships",
+      "groups": [
+        10,
+        9
+      ],
+      "fields": [
+        "best_friends",
+        "romantic_partner",
+        "relationship_preferences",
+        "support_network"
+      ],
+      "questions": [
+        "Who's the friend you text first when something big happens?",
+        "Who are the people you feel most yourself around?"
+      ]
+    },
+    {
+      "item": "Social identity",
+      "groups": [
+        10,
+        8,
+        27,
+        1
+      ],
+      "fields": [
+        "social_groups",
+        "community_membership",
+        "online_communities",
+        "cultural_background"
+      ],
+      "questions": [
+        "What groups or communities do you feel part of, online or offline?",
+        "Where do you feel you really belong?"
+      ]
+    },
+    {
+      "item": "Personal values",
+      "groups": [
+        19
+      ],
+      "fields": [
+        "personal_values",
+        "definition_of_success",
+        "definition_of_happiness",
+        "principles_they_refuse_to_compromise"
+      ],
+      "questions": [
+        "What does a good life look like to you right now?",
+        "Is there something you'd never do, no matter what?"
+      ]
+    },
+    {
+      "item": "Skill development",
+      "groups": [
+        13,
+        6
+      ],
+      "fields": [
+        "skills_under_development",
+        "skills_they_want_to_acquire",
+        "learning_preferences"
+      ],
+      "questions": [
+        "What are you trying to get better at these days?",
+        "Do you learn best by watching, reading, or just trying it?"
+      ]
+    },
+    {
+      "item": "Life experiments",
+      "groups": [
+        22,
+        29,
+        4
+      ],
+      "fields": [
+        "things_they_want_to_experience",
+        "favourite_moments",
+        "openness_to_new_experiences"
+      ],
+      "questions": [
+        "What's something new you tried recently?",
+        "What's on your 'I want to try this someday' list?"
+      ]
+    },
+    {
+      "item": "Future ambitions",
+      "groups": [
+        21,
+        22
+      ],
+      "fields": [
+        "long_term_goals",
+        "future_lifestyle_vision",
+        "their_vision_of_the_future"
+      ],
+      "questions": [
+        "Where do you picture yourself in five years?",
+        "What would make future-you really proud?"
+      ]
+    }
+  ]
+}

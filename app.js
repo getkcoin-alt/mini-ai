@@ -1,900 +1,589 @@
-import { createVoiceRequestGate, voiceResponseError } from './voice-request-gate.js';
-import { installMiniAccountUI } from './mini-identity-ui.js';
-import { createMiniRealtimeUI } from './mini-realtime-ui.js';
-import { miniIdentity } from './mini-supabase.js';
-
-/* Mini AI — frontend-only interactive prototype.
- * Important: browser speech APIs and scripted demo responses are NOT an AI backend,
- * and the Google/email/WhatsApp flows below DO NOT authenticate real users.
+/* Mini — mobile app (installable PWA served by Vercel).
+ * Sign in (Google or email code) → 6-step onboarding → Talk / Memories / You / Settings.
+ * Live voice runs on the private Mini worker through MiniRealtimeSession.
  */
-(function () {
-  'use strict';
+import {
+  configureMiniIdentity, miniIdentity, googleMiniLogin, sendEmailMiniOtp, verifyEmailMiniOtp,
+  signOutMini, readMiniProfile, saveMiniProfile, deleteMiniAccount,
+  mindConsents, setMindConsent, mindFacts, keepMindFact, rejectMindFact, forgetMindFact, tellMind, mindSyncScore
+} from './mini-supabase.js';
+import { MiniRealtimeSession } from './mini-realtime-client.js';
 
-  const voiceGate = createVoiceRequestGate();
-  const STORAGE_KEY = 'mini-ai-design-preview-v1';
-  const DEMO_CODE = '123456';
-  const questions = [
-    { key: 'name', question: 'What should I call you?', help: 'First names, nicknames, anything that feels like you.', placeholder: 'You can say “Call me Alex” or just “Alex”.', kind: 'text' },
-    { key: 'miniName', question: 'And what would you like to call me?', help: 'Mini works. Or give me a name that feels like ours.', placeholder: 'Mini, Momo, Spark — your call.', kind: 'text' },
-    { key: 'relationship', question: 'What do you need from me most?', help: 'There is no wrong choice. You can always switch later.', kind: 'choice', choices: [{ value: 'friend', icon: '♡', label: 'A best friend' }, { value: 'mentor', icon: '✦', label: 'A mentor' }, { value: 'both', icon: '☯', label: 'A bit of both' }] },
-    { key: 'tone', question: 'How should I talk with you?', help: 'Think of how someone close to you would talk when it matters.', kind: 'choice', choices: [{ value: 'gentle', icon: '❀', label: 'Gentle & kind' }, { value: 'balanced', icon: '◎', label: 'Warm & practical' }, { value: 'direct', icon: '↗', label: 'Direct & honest' }] },
-    { key: 'focus', question: "What's taking up space in your mind lately?", help: 'A dream, a project, a worry, or anything you want me to understand.', placeholder: '“I want to change careers, but I keep putting it off...”', kind: 'text' },
-    { key: 'boundaries', question: 'Is there anything you want me to respect?', help: "I can listen, challenge, or give you space. You're in charge.", placeholder: '“Be honest with me, but don’t push when I say stop.”', kind: 'text' }
-  ];
-  const defaults = { name: '', miniName: 'Mini', relationship: 'both', tone: 'balanced', focus: '', boundaries: '' };
-  const state = { profile: { ...defaults }, completed: {}, hasTalked: false, step: 0, auth: 'google', page: 'today', mode: 'friend', isListening: false, recognizer: null, autoSpeak: true, voiceOutput: true, captions: true, lastReply: '', previewGuest: true, demoExploration: false, voiceStatus: { authReady: false, ownerSignedIn: false, workerReady: false, referenceReady: false, voiceReady: false, localStandalone: false }, voiceAbort: null, voiceAudio: null, voiceAudioUrl: null, lastAudioBase64: '', recorder: null, recordingStream: null, recordingTimer: null, sendingVoice: false, suppressPendingVoice: false, discardNextRecording: false, supaUser: null };
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => [...document.querySelectorAll(sel)];
+const app = $('#app');
+const PREFS_KEY = 'mini-app-prefs-v1';
+const ADULT_AGE = 18;
 
-  const $ = (selector) => document.querySelector(selector);
-  const $$ = (selector) => Array.from(document.querySelectorAll(selector));
-  const text = (selector, value) => { const el = $(selector); if (el) el.textContent = value; };
-  const show = (selector, visible) => { const el = $(selector); if (el) el.classList.toggle('hidden', !visible); };
-  function toast(message) {
-    const el = $('#toast');
-    el.textContent = message;
-    el.classList.add('show');
-    clearTimeout(toast.timer);
-    toast.timer = setTimeout(() => el.classList.remove('show'), 3900);
+const state = {
+  user: null,
+  profile: null,          // row from mini_profiles
+  draft: {},              // onboarding answers
+  step: 0,
+  mode: 'friend',
+  session: null,
+  wakeLock: null,
+  installPrompt: null,
+  prefs: loadPrefs(),
+};
+
+/* ---------- small helpers ---------- */
+function loadPrefs() {
+  try { return { captions: true, ...JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') }; }
+  catch { return { captions: true }; }
+}
+function savePrefs() { try { localStorage.setItem(PREFS_KEY, JSON.stringify(state.prefs)); } catch { /* private mode */ } }
+let toastTimer = 0;
+function toast(message) {
+  const el = $('#toast');
+  el.textContent = String(message || '').slice(0, 220);
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 4200);
+}
+function show(screen) {
+  app.dataset.screen = screen;
+  window.scrollTo(0, 0);
+}
+function friendlyError(error) {
+  const msg = String(error?.message || error || 'Something went wrong.');
+  if (/NotAllowedError|Permission denied|permission/i.test(msg))
+    return 'Mini needs your microphone. Allow it in your browser settings, then try again.';
+  if (/NotFoundError|no microphone|Requested device not found/i.test(msg)) return 'No microphone found on this device.';
+  if (/network|Failed to fetch|unreachable/i.test(msg)) return 'Network problem. Check your connection and try again.';
+  return msg.slice(0, 200);
+}
+function ageFrom(birthYear) {
+  const y = Number(birthYear);
+  return y ? new Date().getFullYear() - y : null;
+}
+function greetingWord() {
+  const h = new Date().getHours();
+  return h < 5 ? 'Up late' : h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+}
+
+/* ---------- auth ---------- */
+async function boot() {
+  registerServiceWorker();
+  setupInstall();
+  bindStatic();
+  let config;
+  try { config = await configureMiniIdentity(); }
+  catch { config = { enabled: false }; }
+  if (!config.enabled) {
+    show('welcome');
+    $('#btn-google').disabled = true;
+    $('#btn-email').disabled = true;
+    toast('Sign-in is temporarily unavailable. Please try again soon.');
+    return;
   }
-  function save() {
-    if (state.supaUser) {
-      // Signed-in profiles belong in RLS-protected Supabase, not shared-device
-      // localStorage where the next signed-out browser user could read them.
-      try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
-      return;
-    }
-    if (state.demoExploration) return;
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ profile: state.profile, completed: state.completed, hasTalked: state.hasTalked }));
-    } catch (_) { toast('This browser is not allowing local preview storage.'); }
+  const client = miniIdentity();
+  client.auth.onAuthStateChange((_event, session) => { void onUser(session?.user || null); });
+  const { data } = await client.auth.getSession();
+  await onUser(data?.session?.user || null);
+  // Clean OAuth leftovers (?code=…) from the address bar.
+  if (/[?&](code|error)=/.test(location.search)) history.replaceState(null, '', '/');
+}
+
+let userLoad = 0;
+async function onUser(user) {
+  const run = ++userLoad;
+  if (!user) {
+    stopTalking();
+    state.user = null; state.profile = null;
+    show('welcome');
+    return;
   }
-  function load() {
-    try {
-      const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-      if (data && data.profile && typeof data.profile === 'object') {
-        Object.keys(defaults).forEach((key) => {
-          if (typeof data.profile[key] === 'string' && data.profile[key].length <= 2000) state.profile[key] = data.profile[key];
-        });
-        if (data.completed && typeof data.completed === 'object') {
-          questions.forEach((q) => { if (data.completed[q.key] === true) state.completed[q.key] = true; });
-        }
-        state.hasTalked = data.hasTalked === true;
-        return true;
-      }
-    } catch (_) { /* corrupted preview data should not block launch */ }
-    return false;
-  }
-  function progress() {
-    const weights = { name: 15, miniName: 10, relationship: 20, tone: 15, focus: 20, boundaries: 10 };
-    let score = 0;
-    Object.keys(weights).forEach((k) => { if (state.completed[k] && String(state.profile[k] || '').trim()) score += weights[k]; });
-    if (state.hasTalked) score += 10;
-    return Math.min(100, score);
-  }
-  function nameOr(fallback) { return String(state.profile.name || '').trim() || fallback; }
-  function miniOr() { return String(state.profile.miniName || 'Mini').trim() || 'Mini'; }
-  function roleLabel(value) { return ({ friend: 'A real-talk best friend', mentor: 'A calm, practical mentor', both: 'Best friend + mentor' })[value] || 'Best friend + mentor'; }
-  function toneLabel(value) { return ({ gentle: 'Gentle & encouraging', balanced: 'Warm & practical', direct: 'Straightforward & honest' })[value] || 'Warm & practical'; }
-  function normalizeAnswer(value) {
-    let v = String(value || '').trim().replace(/\s+/g, ' ');
-    v = v.replace(/^(my name is|you can call me|call me|i want you to call me|i'd like you to call me)\s+/i, '');
-    return v;
-  }
-  function previewSummary(q, value) {
-    if (!value) return '';
-    const clean = String(value).trim().replace(/\s+/g, ' ');
-    if (q.key === 'name') return 'I should call you ' + normalizeAnswer(clean).slice(0, 72) + '.';
-    if (q.key === 'miniName') return 'You would like to call your companion ' + normalizeAnswer(clean).slice(0, 72) + '.';
-    if (q.key === 'focus') return 'Something on your mind: ' + clean.slice(0, 260);
-    if (q.key === 'boundaries') return 'A boundary or preference to respect: ' + clean.slice(0, 260);
-    return clean;
-  }
-  function screen(id) {
-    $$('.screen').forEach((el) => el.classList.toggle('active', el.id === 'screen-' + id));
-    document.body.classList.toggle('app-open', id === 'home');
-    window.scrollTo({ top: 0, behavior: 'instant' });
-    if (id === 'home') refreshHome();
-  }
-  function begin() {
-    screen('auth');
-    selectAuth('google');
-  }
-  function selectAuth(method) {
-    state.auth = method;
-    $$('.auth-tab').forEach((el) => { const active = el.dataset.authMethod === method; el.classList.toggle('active', active); el.setAttribute('aria-selected', String(active)); });
-    ['google', 'email', 'whatsapp'].forEach((m) => show('#auth-' + m, m === method));
-  }
-  function emailFlow(event) {
-    event.preventDefault();
-    const address = $('#email-address').value.trim();
-    if (!$('#email-address').checkValidity() || !address) return toast('Enter a valid email address for this UI preview.');
-    const wrap = $('#email-code-wrap');
-    if (wrap.classList.contains('hidden')) {
-      wrap.classList.remove('hidden');
-      text('#email-action', 'Continue with preview code ↗');
-      toast('Demo code: 123456. No email was sent.');
-      return;
-    }
-    if ($('#email-code').value.trim() !== DEMO_CODE) return toast('Use 123456 to preview the verification step.');
-    toast('Preview code accepted. Identity is NOT verified.');
-    startSetup();
-  }
-  function whatsappFlow(event) {
-    event.preventDefault();
-    const phone = $('#wa-phone').value.replace(/\D/g, '');
-    if (phone.length !== 10) return toast('Enter a 10-digit Indian mobile number for this UI preview.');
-    const wrap = $('#wa-code-wrap');
-    if (wrap.classList.contains('hidden')) {
-      wrap.classList.remove('hidden');
-      text('#wa-action', 'Continue with preview code ↗');
-      toast('Demo code: 123456. No WhatsApp message was sent.');
-      return;
-    }
-    if ($('#wa-code').value.trim() !== DEMO_CODE) return toast('Use 123456 to preview the verification step.');
-    toast('Preview code accepted. Identity is NOT verified.');
-    startSetup();
-  }
-  function listen(target) {
-     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      toast('Live speech recognition is not supported in this browser. You can still type.');
-      text('#setup-voice-info', 'This browser does not support speech recognition. Please type your answer.');
-      return;
-    }
-    if (state.recognizer) {
-      state.recognizer.abort();
-      state.recognizer = null;
-      state.isListening = false;
-      updateListening(false);
-      return;
-    }
-    try {
-      stopVoicePlayback();
-      const recognition = new SpeechRecognition();
-      state.recognizer = recognition;
-      recognition.lang = navigator.language || 'en-IN';
-      recognition.interimResults = true;
-      recognition.continuous = false;
-      recognition.maxAlternatives = 1;
-      let captured = '';
-      recognition.onstart = () => { state.isListening = true; updateListening(true); };
-      recognition.onresult = (event) => {
-        let partial = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const candidate = event.results[i][0]?.transcript || '';
-          if (event.results[i].isFinal) captured += candidate + ' ';
-          else partial += candidate;
-        }
-        const value = (captured + partial).trim();
-        if (target === 'setup') {
-          $('#question-answer').value = value;
-          updateSummary();
-        } else {
-          text('#user-transcript', value || 'Listening...');
-          if ($('#type-input')) $('#type-input').value = value;
-        }
-      };
-      recognition.onerror = (event) => {
-        if (event.error !== 'aborted') toast('Microphone unavailable (' + event.error + '). Try typing instead.');
-      };
-      recognition.onend = () => {
-        state.recognizer = null; state.isListening = false; updateListening(false);
-        if (target === 'home' && captured.trim()) handleMessage(captured.trim());
-      };
-      recognition.start();
-    } catch (_) {
-      state.recognizer = null; state.isListening = false; updateListening(false);
-      toast('Could not start the microphone. Check browser permissions.');
-    }
-  }
-  function updateListening(active) {
-    $('#talk-button')?.classList.toggle('listening', active);
-    text('#talk-icon', active ? '■' : '🎙');
-    text('#voice-state', active ? 'Listening to you...' : 'Ready when you are.');
-    if (!state.recorder && !state.sendingVoice) text('#voice-helper', active ? 'Speak naturally. Tap the mic to stop.' : 'Tap to talk');
-    text('#setup-voice-info', active ? '🎙 Listening... speak at your own pace.' : '🎙 Microphone support depends on your browser. Typing always works.');
-    text('#speak-answer span', active ? 'Stop listening' : 'Speak instead');
-  }
-  function startSetup() {
-    state.demoExploration = false;
-    state.step = 0;
-    screen('setup');
-    renderQuestion(true);
-  }
-  function renderQuestion(announce) {
-    const q = questions[state.step];
-    text('#step-counter', String(state.step + 1).padStart(2, '0') + ' / ' + String(questions.length).padStart(2, '0'));
-    $('#step-progress-bar').style.width = Math.round(((state.step + 1) / questions.length) * 100) + '%';
-    text('#question-text', q.question);
-    text('#question-help', q.help);
-    text('#question-speaker', miniOr().toLowerCase() + ' is curious');
-    text('#next-question', state.step === questions.length - 1 ? 'Meet your Mini ↗' : 'Save & continue ↗');
-    show('#answer-wrap', q.kind === 'text');
-    show('#question-choices', q.kind === 'choice');
-    if (q.kind === 'text') {
-      $('#question-answer').placeholder = q.placeholder || 'Say it your way...';
-      $('#question-answer').value = state.completed[q.key] ? (state.profile[q.key] || '') : '';
+  if (state.user?.id === user.id && state.profile && app.dataset.screen === 'main') return;
+  state.user = user;
+  show('loading');
+  let profile = null;
+  try { profile = await readMiniProfile(); }
+  catch (error) { toast('Could not load your profile: ' + friendlyError(error)); }
+  if (run !== userLoad) return;
+  state.profile = profile;
+  const age = ageFrom(profile?.birth_year);
+  if (!profile || !profile.birth_year || !profile.display_name) return startOnboarding(profile);
+  if (age !== null && age < ADULT_AGE) return show('kids');
+  enterMain();
+}
+
+/* ---------- onboarding ---------- */
+const STEPS = [
+  { key: 'name', q: 'What should I call you?', help: 'First name, nickname — whatever feels like you.', kind: 'text',
+    placeholder: 'Your name', required: true, max: 80 },
+  { key: 'birthYear', q: 'What year were you born?', help: 'So I can talk with you in the right way for your age.',
+    kind: 'year', required: true },
+  { key: 'relationship', q: 'What would you like me to be?', kind: 'choice', options: [
+    ['friend', 'A best friend', 'Fun, warm, always up for a chat'],
+    ['mentor', 'A mentor', 'Calm, practical, helps you grow'],
+    ['both', 'A bit of both', 'Whatever you need that day']] },
+  { key: 'tone', q: 'How should I talk with you?', kind: 'choice', options: [
+    ['gentle', 'Gently', 'Soft and encouraging'],
+    ['balanced', 'Balanced', 'Friendly and honest'],
+    ['direct', 'Straight up', 'Short and to the point']] },
+  { key: 'focus', q: "What's on your mind these days?", help: 'Work, studies, family, a goal — anything. You can skip this.',
+    kind: 'area', placeholder: 'e.g. Preparing for exams, missing home…', max: 600 },
+  { key: 'boundaries', q: 'Anything I should avoid talking about?', help: "Totally optional. I'll respect it.",
+    kind: 'area', placeholder: "e.g. Please don't bring up my ex", max: 600, last: true },
+];
+
+function startOnboarding(profile) {
+  state.draft = {
+    name: profile?.display_name || '', birthYear: profile?.birth_year ? String(profile.birth_year) : '',
+    relationship: profile?.companion_mode || 'friend', tone: profile?.tone || 'balanced',
+    focus: profile?.focus || '', boundaries: profile?.boundaries || '', miniName: profile?.mini_name || 'Mini',
+  };
+  state.step = 0;
+  renderStep();
+  show('onboard');
+}
+
+function renderStep() {
+  const step = STEPS[state.step];
+  $('#ob-count').textContent = String(state.step + 1).padStart(2, '0') + ' / ' + String(STEPS.length).padStart(2, '0');
+  $('#ob-bar').style.width = ((state.step + 1) / STEPS.length * 100) + '%';
+  $('#ob-question').textContent = step.q;
+  $('#ob-help').textContent = step.help || '';
+  $('#ob-skip').classList.toggle('hidden', Boolean(step.required));
+  $('#ob-next').textContent = step.last ? "Let's talk" : 'Next';
+  const box = $('#ob-input');
+  box.replaceChildren();
+  const value = state.draft[step.key] || '';
+  if (step.kind === 'text' || step.kind === 'year') {
+    const input = document.createElement('input');
+    input.id = 'ob-field';
+    input.value = value;
+    if (step.kind === 'year') {
+      Object.assign(input, { inputMode: 'numeric', maxLength: 4, placeholder: 'e.g. 1998', autocomplete: 'bday-year' });
     } else {
-      const container = $('#question-choices');
-      container.replaceChildren();
-      q.choices.forEach((c) => {
-        const button = document.createElement('button');
-        button.className = 'choice' + (state.completed[q.key] && state.profile[q.key] === c.value ? ' active' : '');
-        button.type = 'button';
-        button.dataset.choice = c.value;
-        const symbol = document.createElement('span');
-        symbol.textContent = c.icon;
-        const label = document.createElement('strong');
-        label.textContent = c.label;
-        button.append(symbol, label);
-        button.addEventListener('click', () => {
-          state.profile[q.key] = c.value;
-          state.completed[q.key] = true;
-          container.querySelectorAll('.choice').forEach((item) => item.classList.toggle('active', item === button));
-          refreshProfilePreview();
-        });
-        container.append(button);
+      Object.assign(input, { maxLength: step.max, placeholder: step.placeholder, autocomplete: 'nickname' });
+    }
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); nextStep(); } });
+    box.append(input);
+    setTimeout(() => input.focus(), 60);
+  } else if (step.kind === 'area') {
+    const area = document.createElement('textarea');
+    Object.assign(area, { id: 'ob-field', rows: 4, maxLength: step.max, placeholder: step.placeholder, value });
+    box.append(area);
+  } else if (step.kind === 'choice') {
+    for (const [val, title, sub] of step.options) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'choice'; b.dataset.value = val;
+      b.setAttribute('aria-pressed', String(value === val));
+      const strong = document.createElement('strong'); strong.textContent = title;
+      const small = document.createElement('small'); small.textContent = sub;
+      b.append(strong, small);
+      b.addEventListener('click', () => {
+        state.draft[step.key] = val;
+        $$('#ob-input .choice').forEach((c) => c.setAttribute('aria-pressed', String(c === b)));
       });
+      box.append(b);
     }
-    updateSummary();
-    refreshProfilePreview();
-    if (announce && state.autoSpeak && !voiceGate.isBusy() && !state.sendingVoice) void speak(q.question, state.mode, { automatic: true });
   }
-  function updateSummary() {
-    const q = questions[state.step];
-    if (q.kind !== 'text') { show('#summary-preview', false); return; }
-    const value = $('#question-answer').value.trim();
-    show('#summary-preview', Boolean(value));
-    if (value) text('#summary-text', previewSummary(q, value));
-  }
-  function saveStep(skip) {
-    const q = questions[state.step];
-    if (!skip) {
-      if (q.kind === 'text') {
-        let value = $('#question-answer').value.trim();
-        if (q.key === 'name' || q.key === 'miniName') value = normalizeAnswer(value).slice(0, 72);
-        else value = value.slice(0, 800);
-        if (!value) return toast('Give it a try, or choose “I’ll tell you later”.');
-        state.profile[q.key] = value;
-        state.completed[q.key] = true;
-      } else if (!state.completed[q.key]) return toast('Pick the answer that feels right, or skip for now.');
+  if (step.last) {
+    for (const [id, html] of [
+      ['ob-consent', 'Remember my answers so Mini can get to know me. I can change or delete them anytime.'],
+      ['ob-learn', 'Let Mini learn from our conversations — your day, people and goals — so it truly gets to know you. You review everything in Memories.'],
+      ['ob-terms', 'I agree to the <a href="/terms.html" target="_blank">Terms</a> and <a href="/privacy.html" target="_blank">Privacy Policy</a>.']]) {
+      const label = document.createElement('label'); label.className = 'consent';
+      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.id = id;
+      const span = document.createElement('span'); span.innerHTML = html; // static, trusted text
+      label.append(cb, span); box.append(label);
     }
-    if (skip && !state.completed[q.key]) {
-      state.profile[q.key] = defaults[q.key];
-    }
-    save();
-    if (state.step >= questions.length - 1) return enterHome();
-    state.step++;
-    renderQuestion(true);
   }
-  function refreshProfilePreview() {
-    const p = state.profile;
-    text('#profile-name', state.completed.name ? nameOr('You') : 'Getting acquainted...');
-    text('#profile-mini', state.completed.miniName ? miniOr() : 'Mini');
-    text('#profile-mode', state.completed.relationship ? roleLabel(p.relationship) : 'Your personal companion');
-    text('#profile-tone', state.completed.tone ? toneLabel(p.tone) : 'Still discovering');
-    text('#profile-goal', state.completed.focus ? p.focus.slice(0, 110) : "We'll find out together.");
-    const percent = progress();
-    text('#setup-sync-text', percent + '%');
-    $('#setup-sync-bar').style.width = percent + '%';
-  }
-  function enterHome() {
-    state.mode = state.profile.relationship === 'mentor' ? 'mentor' : 'friend';
-    screen('home');
-    setPage('today');
-    refreshHome();
-    save();
-  }
-  function refreshHome() {
-    const p = state.profile;
-    const percent = progress();
-    text('#home-greeting', 'Hey, ' + nameOr('you') + '. I’m right here.');
-    text('#mini-display-name', miniOr().toLowerCase());
-    text('#sidebar-sync', percent + '% synced');
-    text('#home-sync', percent + '%');
-    $('#home-sync-bar').style.width = percent + '%';
-    $('#sidebar-sync-bar').style.width = percent + '%';
-    text('#sidebar-name', nameOr('Your space'));
-    text('#user-initial', nameOr('Y').charAt(0).toUpperCase());
-    text('#app-initial', nameOr('Y').charAt(0).toUpperCase());
-    text('#sync-message', percent >= 80 ? "You've shared a lot of useful context. Long-term memory is the next step." : percent >= 45 ? "You're shaping Mini's tone and priorities. Keep going when you feel ready." : 'Share a few preferences to shape your companion.');
-    text('#unlock-vibe', percent >= 20 ? '✓' : '○');
-    text('#unlock-mode', state.completed.relationship ? '✓' : '○');
-    text('#unlock-context', state.completed.focus && state.completed.boundaries ? '✓' : '○');
-    $$('.mode-switch [data-mode]').forEach((el) => el.classList.toggle('active', el.dataset.mode === state.mode));
-    $('#show-captions').checked = state.captions;
-    $('#voice-output').checked = state.voiceOutput;
-    $('#transcript-panel').classList.toggle('hidden', !state.captions);
-    text('#toggle-captions', state.captions ? '◫ Captions on' : '◫ Captions off');
-    $('#toggle-captions').setAttribute('aria-pressed', String(state.captions));
-  }
-  function setPage(page) {
-    state.page = page;
-    $$('.app-page').forEach((el) => el.classList.toggle('active', el.id === 'app-page-' + page));
-    $$('[data-app-page]').forEach((el) => el.classList.toggle('active', el.dataset.appPage === page));
-    text('#current-page-label', ({ today: 'MY SPACE', profile: 'OUR DYNAMIC', memory: 'MEMORIES', devices: 'DEVICES', settings: 'PREFERENCES' })[page] || 'MY SPACE');
-    if (page === 'profile') fillProfileEdit();
-    window.scrollTo({ top: 0, behavior: 'instant' });
-  }
-  function fillProfileEdit() {
-    const p = state.profile;
-    $('#edit-name').value = p.name;
-    $('#edit-mini-name').value = p.miniName;
-    $('#edit-mode').value = p.relationship;
-    $('#edit-tone').value = p.tone;
-    $('#edit-focus').value = p.focus;
-    $('#edit-boundaries').value = p.boundaries;
-  }
-  function saveProfile(event) {
-    event.preventDefault();
-    const next = {
-      name: $('#edit-name').value.trim().slice(0, 72),
-      miniName: $('#edit-mini-name').value.trim().slice(0, 72),
-      relationship: $('#edit-mode').value,
-      tone: $('#edit-tone').value,
-      focus: $('#edit-focus').value.trim().slice(0, 800),
-      boundaries: $('#edit-boundaries').value.trim().slice(0, 800)
-    };
-    if (!next.name || !next.miniName) return toast('Please add a name for both you and Mini.');
-    state.profile = next;
-    Object.keys(next).forEach((key) => { state.completed[key] = Boolean(next[key]); });
-    save(); refreshHome();
-    toast('Preferences saved locally in this browser.');
-  }
-  function previewReply(message) {
-    const cleaned = message.toLowerCase();
-    const mode = state.mode;
-    const person = nameOr('friend').split(' ')[0].slice(0, 28);
-    if (/hello|hey|hi\b|good morning|good evening/.test(cleaned)) {
-      return mode === 'mentor' ? 'Hey ' + person + '. What would make today feel like progress?' : 'Hey ' + person + '! So good to hear you. What’s happening?';
-    }
-    if (/anxious|sad|worried|stressed|alone|scared|overwhelmed|not okay/.test(cleaned)) {
-      return mode === 'mentor' ? 'I hear you. What’s the one part of this we can actually change today?' : 'That sounds like a lot to carry. Want to tell me what happened?';
-    }
-    if (/goal|work|study|business|career|project|deadline|focus|productive/.test(cleaned)) {
-      return mode === 'mentor' ? 'Okay, let’s make this practical. What’s the smallest next step you could do in twenty minutes?' : 'Ooh, we have a mission. What part are you most excited about?';
-    }
-    if (/thank|love|friend/.test(cleaned)) return mode === 'mentor' ? 'Glad to be useful. What shall we tackle next?' : 'Aw, I’m glad we’re talking. What else is on your mind?';
-    if (/who are you|what are you|real/.test(cleaned)) return 'I’m Mini, your AI companion. This is a scripted voice preview, but the real version will learn with your permission.';
-    return mode === 'mentor' ? 'I’m listening. What matters most about that, and what would a good outcome look like?' : 'Wait, tell me more. What happened next?';
-  }
-  function handleMessage(message) {
-    const value = String(message || '').trim().slice(0, 500);
-    if (!value) return;
-    if (canUseWorker()) { void sendTextTurn(value); return; }
-    if (state.supaUser) return toast('Real Mini conversation is not connected yet. No scripted AI reply was generated.');
-    const reply = previewReply(value);
-    state.lastReply = reply;
-    state.hasTalked = true;
-    text('#user-transcript', value);
-    text('#mini-transcript', '“' + reply + '”');
-    text('#voice-state', 'Here with you.');
-    $('#type-input').value = '';
-    save(); refreshHome();
-    void speak(reply);
-  }
-  function demoExplore() {
-    if (!state.profile.name) {
-      state.profile.name = 'Explorer';
-      state.profile.miniName = 'Mini';
-      state.profile.relationship = 'both';
-      state.profile.tone = 'balanced';
-    }
-    state.demoExploration = true;
-    state.mode = 'friend';
-    screen('home'); setPage('today');
-    toast('Exploring a design demo. Nothing here is a connected AI service.');
-  }
-  function resetData() {
-    if (!confirm('Clear the local preview profile and restart? This cannot be undone.')) return;
-    try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
-    state.profile = { ...defaults };
-    state.completed = {};
-    state.hasTalked = false;
-    state.lastReply = '';
-    state.demoExploration = false;
-    screen('welcome');
-    toast('Local preview data cleared.');
-  }
+}
 
+function readStepValue() {
+  const step = STEPS[state.step];
+  const field = $('#ob-field');
+  if (field) state.draft[step.key] = field.value.trim();
+  return state.draft[step.key] || '';
+}
 
-  // Independent, zero-shot Mini voice. No ElevenLabs API calls or models.
-  const canUseWorker = () => Boolean(state.voiceStatus.voiceReady && state.voiceStatus.workerReady
-    && (state.voiceStatus.localStandalone || state.voiceStatus.ownerSignedIn));
-
-  function stopVoicePlayback() {
-    // Cancel only playback. Aborting HTTP does NOT reliably stop server-side
-    // model inference and can cause the next request to hit HTTP 429.
-    if (state.voiceAudio) { try { state.voiceAudio.pause(); state.voiceAudio.src = ''; } catch (_) {} }
-    state.voiceAudio = null;
-    if (state.voiceAudioUrl) { URL.revokeObjectURL(state.voiceAudioUrl); state.voiceAudioUrl = null; }
-    $('#app-orb')?.classList.remove('speaking');
+async function nextStep(skip = false) {
+  const step = STEPS[state.step];
+  const value = skip ? '' : readStepValue();
+  if (skip) state.draft[step.key] = '';
+  if (step.required && !value) return toast('Please answer this one so I know you.');
+  if (step.key === 'birthYear') {
+    const year = Number(value), now = new Date().getFullYear();
+    if (!/^\d{4}$/.test(value) || year < 1920 || year > now - 5) return toast('Please enter a valid birth year.');
+    if (now - year < ADULT_AGE) return show('kids'); // nothing is saved for under-18s yet
   }
+  if (!step.last) { state.step++; renderStep(); return; }
+  if (!$('#ob-consent').checked || !$('#ob-terms').checked)
+    return toast('Please tick both boxes so Mini can remember you.');
+  const btn = $('#ob-next'); btn.disabled = true;
+  try {
+    const d = state.draft;
+    await saveMiniProfile({ name: d.name, miniName: d.miniName || 'Mini', relationship: d.relationship || 'friend',
+      tone: d.tone || 'balanced', focus: d.focus || '', boundaries: d.boundaries || '', birthYear: d.birthYear }, true);
+    state.profile = await readMiniProfile();
+    if ($('#ob-learn').checked) {
+      try { await setMindConsent('learn_from_conversations', true); await setMindConsent('proactive_followups', true); }
+      catch (error) { toast('Could not save the learning choice: ' + friendlyError(error)); }
+    }
+    enterMain();
+    setTimeout(() => toast("You're all set! Tap Mini whenever you want to talk."), 400);
+  } catch (error) {
+    toast('Could not save: ' + friendlyError(error));
+  } finally { btn.disabled = false; }
+}
 
-  async function voiceRequest(path, payload, method = 'POST') {
-    const inferenceRequest = /^(speak|chat|turn|sample)(\?|$)/.test(path);
-    const work = async () => {
-      const controller = new AbortController();
-      state.voiceAbort = controller;
-      try {
-        const res = await fetch('/api/voice/' + path, {
-          method, credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
-          ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
-          signal: controller.signal
-        });
-        const result = await res.json().catch(() => ({}));
-        if (!res.ok) throw voiceResponseError(res.status, result);
-        return result;
-      } finally {
-        if (state.voiceAbort === controller) state.voiceAbort = null;
-      }
-    };
-    if (!inferenceRequest) return work();
-    try {
-      return await voiceGate.run(async () => {
-        updateVoiceUi();
-        return work();
+/* ---------- main app ---------- */
+function enterMain() {
+  const p = state.profile || {};
+  state.mode = p.companion_mode === 'mentor' ? 'mentor' : 'friend';
+  $('#greet-time').textContent = greetingWord();
+  $('#greet-name').textContent = 'Hi, ' + (p.display_name || 'friend');
+  $('#set-email').textContent = state.user?.email || '';
+  updateModeChip();
+  fillYouForm();
+  applyCaptions();
+  setTalkState('idle');
+  show('main');
+  setTab('talk');
+  void refreshMind();
+}
+
+/* ---------- mind: sync %, learning consent ---------- */
+async function refreshMind() {
+  try {
+    const sync = await mindSyncScore();
+    if (sync && sync.score !== undefined && sync.score !== null) {
+      $('#sync-chip').textContent = 'Mini knows you ' + sync.score + '%';
+      $('#sync-chip').classList.remove('hidden');
+    }
+  } catch { /* mind not available yet */ }
+  try { $('#set-learn').checked = (await mindConsents()).has('learn_from_conversations'); }
+  catch { $('#set-learn').disabled = true; }
+}
+
+function setTab(name) {
+  $$('.tab').forEach((t) => {
+    const on = t.dataset.tab === name;
+    t.classList.toggle('active', on);
+    if (on) t.setAttribute('aria-current', 'page'); else t.removeAttribute('aria-current');
+  });
+  $$('.panel').forEach((p) => { p.hidden = p.id !== 'p-' + name; });
+  if (name === 'memories') void loadMemories();
+  window.scrollTo(0, 0);
+}
+
+function updateModeChip() {
+  $('#mode-chip').textContent = state.mode === 'mentor' ? '✦ Mentor' : '♡ Friend';
+}
+
+/* ---------- talk ---------- */
+const TALK_TEXT = {
+  idle: ['Tap Mini to talk', 'Tell me how your day went.'],
+  checking: ['Getting ready…', ''],
+  connecting: ['Connecting…', ''],
+  authenticating: ['Connecting…', ''],
+  queued: ['Mini is busy', ''],
+  listening: ["I'm listening", 'Talk naturally. Tap Mini to interrupt.'],
+  thinking: ['Thinking…', ''],
+  speaking: ['Mini is talking', 'Just start talking to interrupt.'],
+};
+
+function setTalkState(status, sub) {
+  const orb = $('#orb');
+  const [title, defaultSub] = TALK_TEXT[status] || TALK_TEXT.idle;
+  orb.dataset.state = status;
+  $('#talk-status').textContent = title;
+  $('#talk-sub').textContent = sub ?? defaultSub;
+  const live = !['idle'].includes(status);
+  const btn = $('#talk-btn');
+  btn.textContent = live ? 'End conversation' : 'Start talking';
+  btn.classList.toggle('end', live);
+  orb.setAttribute('aria-label', live ? (status === 'speaking' ? 'Interrupt Mini' : 'Mini is listening') : 'Start talking with Mini');
+}
+
+async function preflight() {
+  const { data } = await miniIdentity().auth.getSession();
+  const token = data?.session?.access_token;
+  if (!token) throw new Error('Please sign in again.');
+  const res = await fetch('/api/voice/realtime-config', { headers: { Authorization: 'Bearer ' + token }, cache: 'no-store' });
+  const body = await res.json().catch(() => ({}));
+  if (res.status === 401) throw new Error('Please sign in again.');
+  if (body.enabled) return;
+  const reasons = {
+    owner_only: "Mini's voice is opening to everyone very soon. Thanks for your patience!",
+    not_invited: 'Mini is in a private preview right now. Your invite is coming soon!',
+    email_unconfirmed: 'Please confirm your email address first.',
+    age_confirmation_required: 'Mini is for adults right now. Mini for kids is coming soon.',
+    nfc_gateway_not_ready: "Mini's voice is resting for maintenance. Please try again shortly.",
+  };
+  throw new Error(reasons[body.reason] || 'Mini is not available right now. Please try again soon.');
+}
+
+async function startTalking() {
+  if (state.session) return;
+  $('#cap-user').textContent = ''; $('#cap-mini').textContent = ''; $('#talk-meta').textContent = '';
+  setTalkState('checking');
+  try { await preflight(); }
+  catch (error) { setTalkState('idle', friendlyError(error)); return; }
+  const session = new MiniRealtimeSession({ onEvent: onTalkEvent, onClose: onTalkClosed });
+  state.session = session;
+  try {
+    await session.start(state.mode);
+  } catch (error) {
+    session.fail?.(error);
+    state.session = null;
+    setTalkState('idle', friendlyError(error));
+  }
+}
+
+function stopTalking() {
+  const s = state.session;
+  state.session = null;
+  try { s?.stop(); } catch { /* already closed */ }
+  releaseWakeLock();
+}
+
+function onTalkClosed() {
+  state.session = null;
+  releaseWakeLock();
+  setTimeout(() => void refreshMind(), 45000);   // Mini finishes learning shortly after a talk
+  if ($('#orb').dataset.state !== 'idle') setTalkState('idle', 'Tap Mini to talk again.');
+}
+
+let endsAt = 0, meterTimer = 0;
+function onTalkEvent(event) {
+  switch (event.type) {
+    case 'ui.state':
+      if (event.status === 'listening') { void keepAwake(); }
+      if (TALK_TEXT[event.status]) setTalkState(event.status);
+      break;
+    case 'ui.queued':
+      setTalkState('queued', event.message || 'Mini is talking with someone else. You will be connected automatically.');
+      break;
+    case 'ui.ending':
+      setTalkState('idle', event.message || 'Conversation ended.');
+      break;
+    case 'ui.error':
+      setTalkState('idle', friendlyError(event.message));
+      break;
+    case 'input.transcript.final':
+      $('#cap-user').textContent = event.text || '';
+      $('#cap-mini').textContent = '';
+      break;
+    case 'response.text.delta':
+      $('#cap-mini').textContent += event.text || '';
+      break;
+    case 'ui.interrupted':
+      setTalkState('listening', 'Go ahead, I\'m listening.');
+      break;
+    default: break;
+  }
+}
+
+function applyCaptions() {
+  $('#captions').classList.toggle('off', !state.prefs.captions);
+  $('#set-captions').checked = state.prefs.captions;
+}
+
+async function keepAwake() {
+  try { if ('wakeLock' in navigator && !state.wakeLock) state.wakeLock = await navigator.wakeLock.request('screen'); }
+  catch { /* not supported or denied: fine */ }
+}
+function releaseWakeLock() {
+  try { state.wakeLock?.release(); } catch { /* ignore */ }
+  state.wakeLock = null;
+}
+
+/* ---------- memories (Mini's mind) ---------- */
+const GROUPS = ['Identity', 'Physical', 'Health', 'Personality', 'Emotions', 'Learning', 'Communication', 'Language & culture',
+  'Family', 'Relationships', 'Life history', 'Education', 'Skills', 'Career', 'Finances', 'Daily life', 'Interests',
+  'Likes', 'Values', 'Spirituality', 'Goals', 'Dreams', 'Worries', 'Motivation', 'Decisions', 'Surroundings',
+  'Digital life', 'Responsibilities', 'Experiences', 'How Mini helps'];
+function factItem(f, actions) {
+  const li = document.createElement('li'); li.className = 'mem-item' + (f.consent_status === 'pending' ? ' pending' : '');
+  const p = document.createElement('p');
+  const kind = document.createElement('span'); kind.className = 'mem-kind';
+  kind.textContent = (GROUPS[f.group_id - 1] || 'Memory') + ' · ' + f.attribute_name;
+  p.append(kind, document.createTextNode(f.value));
+  li.append(p, actions(li));
+  return li;
+}
+async function loadMemories() {
+  try {
+    const { known, pending } = await mindFacts();
+    $('#noticed').classList.toggle('hidden', pending.length === 0);
+    $('#noticed-list').replaceChildren(...pending.map((f) => factItem(f, (li) => {
+      const row = document.createElement('div'); row.className = 'keep-actions';
+      const keep = document.createElement('button'); keep.type = 'button'; keep.className = 'btn btn-primary'; keep.textContent = 'Keep';
+      const no = document.createElement('button'); no.type = 'button'; no.className = 'btn btn-ghost'; no.textContent = 'Not true';
+      keep.addEventListener('click', async () => {
+        try { await keepMindFact(f.id); toast('Kept. Mini will remember.'); void loadMemories(); void refreshMind(); }
+        catch (error) { toast(friendlyError(error)); }
       });
-    } finally {
-      // The gate has released by now; re-enable local controls.
-      updateVoiceUi();
-    }
-  }
-
-  async function toBase64(blob) {
-    return await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
-      reader.onerror = () => reject(new Error('Could not read audio from this browser.'));
-      reader.readAsDataURL(blob);
-    });
-  }
-
-  async function playLocalAudio(base64) {
-    if (!base64) throw new Error('Local model returned no voice recording.');
-    stopVoicePlayback();
-    const decoded = atob(base64);
-    const bytes = new Uint8Array(decoded.length);
-    for (let i = 0; i < decoded.length; i++) bytes[i] = decoded.charCodeAt(i);
-    const url = URL.createObjectURL(new Blob([bytes], { type: 'audio/wav' }));
-    state.voiceAudioUrl = url;
-    const audio = new Audio(url);
-    state.voiceAudio = audio;
-    audio.onplay = () => { $('#app-orb')?.classList.add('speaking'); text('#voice-state', 'Mini is speaking in your chosen voice...'); };
-    audio.onended = () => {
-      $('#app-orb')?.classList.remove('speaking'); text('#voice-state', 'Ready when you are.');
-      if (state.voiceAudioUrl === url) { URL.revokeObjectURL(url); state.voiceAudioUrl = null; }
-    };
-    audio.onerror = () => toast('Audio playback failed. Try again.');
-    try { await audio.play(); }
-    catch (_) { toast('Tap replay to hear the generated Mini voice.'); }
-  }
-
-  async function speak(message, mode = state.mode, { automatic = false } = {}) {
-    if (!state.voiceOutput || !message) return false;
-    if (canUseWorker()) {
-      if (voiceGate.isBusy() || state.sendingVoice) {
-        if (!automatic) toast('Mini is finishing another voice response. Please try again shortly.');
-        return false;
-      }
-      state.suppressPendingVoice = false;
-      try {
-        stopVoicePlayback();
-        text('#voice-state', 'Generating your local Mini voice...');
-        const response = await voiceRequest('speak', { text: String(message).slice(0, 700), language: 'en', mode });
-        state.lastAudioBase64 = response.audio_base64 || '';
-        if (state.suppressPendingVoice) {
-          text('#voice-state', 'Voice muted. You can replay it when ready.');
-          return true;
-        }
-        await playLocalAudio(state.lastAudioBase64);
-        return true;
-      } catch (error) {
-        if (error.name !== 'AbortError') toast('Local voice failed: ' + error.message);
-        text('#voice-state', 'Local voice unavailable.');
-        return false;
-      }
-    }
-    // Mini speaks only in its one server voice. No browser or OS voices.
-    return false;
-  }
-
-  function applyVoiceReply(result) {
-    text('#user-transcript', result.transcript || 'Voice recording');
-    text('#mini-transcript', '“' + (result.reply || '') + '”');
-    state.lastReply = result.reply || '';
-    state.lastAudioBase64 = result.audio_base64 || '';
-    state.hasTalked = true; save(); refreshHome();
-    if (state.voiceOutput && result.audio_base64 && !state.suppressPendingVoice) void playLocalAudio(result.audio_base64);
-    else text('#voice-state', state.suppressPendingVoice ? 'Reply ready · audio muted.' : 'Response ready.');
-  }
-
-  async function sendTextTurn(message) {
-    if (!canUseWorker()) return handleMessage(message);
-    if (state.sendingVoice || voiceGate.isBusy()) return toast('Mini is finishing a voice response. Try again when it is ready.');
-    state.suppressPendingVoice = false;
-    state.sendingVoice = true;
-    stopVoicePlayback();
-    text('#voice-state', 'Thinking and generating a voice...');
-    text('#user-transcript', message);
-    $('#type-input').value = '';
-    try {
-      const detected = /[\u0900-\u097F]/.test(message) ? 'hi' : 'en';
-      const answer = await voiceRequest('chat', { text: message.slice(0, 700), language: detected, mode: state.mode });
-      applyVoiceReply(answer);
-    } catch (error) {
-      if (error.name !== 'AbortError') toast('Local AI reply failed: ' + error.message);
-    } finally { state.sendingVoice = false; updateVoiceUi(); }
-  }
-
-  async function toggleVoiceRecording() {
-    if (state.recorder) {
-      if (state.recorder.state === 'recording') state.recorder.stop();
-      return;
-    }
-    if (!canUseWorker()) return listen('home');
-    if (state.sendingVoice || voiceGate.isBusy()) return toast('Mini is still generating a response. Try again shortly.');
-    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) return toast('This browser cannot record voice. Try typing.');
-    try {
-      stopVoicePlayback();
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
-      const formats = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm', 'audio/ogg'];
-      const chosen = formats.find(type => MediaRecorder.isTypeSupported(type)) || '';
-      const recorder = chosen ? new MediaRecorder(stream, { mimeType: chosen }) : new MediaRecorder(stream);
-      const chunks = [];
-      state.recorder = recorder;
-      state.recordingStream = stream;
-      recorder.ondataavailable = event => { if (event.data?.size) chunks.push(event.data); };
-      recorder.onstop = async () => {
-        clearTimeout(state.recordingTimer); state.recordingTimer = null;
-        stream.getTracks().forEach(track => track.stop());
-        state.recordingStream = null;
-        state.recorder = null;
-        $('#talk-button').classList.remove('listening');
-        text('#talk-icon', '🎙');
-        if (state.discardNextRecording) {
-          state.discardNextRecording = false;
-          text('#voice-state', 'Recording discarded.');
-          return;
-        }
-        const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
-        if (blob.size < 1000) { toast('No audio was recorded. Try again.'); return; }
-        if (blob.size > 3_000_000) { toast('Recording too large. Try a shorter message.'); return; }
-        state.suppressPendingVoice = false;
-        state.sendingVoice = true;
-        text('#voice-state', 'Hearing, thinking, speaking...');
-        try {
-          const answer = await voiceRequest('turn', {
-            audio_base64: await toBase64(blob),
-            mime: (recorder.mimeType || blob.type || 'audio/webm').split(';')[0],
-            mode: state.mode
-          });
-          applyVoiceReply(answer);
-        } catch (error) {
-          if (error.name !== 'AbortError') toast('Speech turn failed: ' + error.message);
-          text('#voice-state', 'Could not finish this voice turn.');
-        } finally { state.sendingVoice = false; updateVoiceUi(); }
-      };
-      recorder.start();
-      $('#talk-button').classList.add('listening');
-      text('#talk-icon', '■');
-      text('#voice-state', 'Listening to your voice...');
-      text('#voice-helper', 'Tap the square to send · Up to 12 seconds per turn');
-      state.recordingTimer = setTimeout(() => { if (recorder.state === 'recording') recorder.stop(); }, 12000);
-    } catch (error) { toast('Microphone permission required: ' + error.message); }
-  }
-
-  const canSyncProfile = () => Boolean(state.supaUser || (state.voiceStatus.workerReady &&
-    (state.voiceStatus.ownerSignedIn || state.voiceStatus.localStandalone)));
-
-  function updateMemoryUi() {
-    const allowed = canSyncProfile();
-    $('#memory-consent').disabled = !allowed;
-    $('#memory-save').disabled = !allowed;
-    $('#memory-forget').disabled = !allowed;
-    if (!allowed) text('#memory-status', 'Private Mini AI memory is offline. Your setup stays only in this browser.');
-  }
-
-  async function readMemoryStatus() {
-    if (state.supaUser) return;
-    if (!canSyncProfile()) return updateMemoryUi();
-    try {
-      const res = await fetch('/api/voice/profile', { credentials: 'same-origin', cache: 'no-store' });
-      if (!res.ok) throw new Error('Profile service unavailable');
-      const data = await res.json();
-      text('#memory-status', data.saved ? 'Profile saved on your private worker. Mini can use it in spoken replies.' : 'No server profile saved. You control when Mini remembers.');
-    } catch (_) {
-      text('#memory-status', 'Could not read private memory. Your browser preferences remain local.');
-    }
-  }
-
-  async function syncPrivateProfile() {
-    if (!canSyncProfile()) return toast('Connect your private Mini AI worker before saving memory.');
-    if (!$('#memory-consent').checked) return toast('Confirm your permission before saving profile facts.');
-    const profile = {};
-    questions.forEach(q => { if (state.completed[q.key] && String(state.profile[q.key] || '').trim()) profile[q.key] = String(state.profile[q.key]).slice(0, q.key === 'focus' || q.key === 'boundaries' ? 600 : 80); });
-    if (!Object.keys(profile).length) return toast('Answer at least one setup question first.');
-    $('#memory-save').disabled = true;
-    try {
-      const res = await fetch('/api/voice/profile', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profile, consent: true })
+      no.addEventListener('click', async () => {
+        try { await rejectMindFact(f.id); li.remove(); toast("Got it, Mini won't assume that."); void loadMemories(); }
+        catch (error) { toast(friendlyError(error)); }
       });
-      const result = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(result.error || result.detail || 'Profile save failed');
-      $('#memory-consent').checked = false;
-      await readMemoryStatus();
-      toast('Mini saved only the setup facts you selected.');
-    } catch (error) { toast('Memory sync failed: ' + error.message); }
-    finally { updateMemoryUi(); }
-  }
+      row.append(keep, no);
+      return row;
+    })));
+    $('#mem-list').replaceChildren(...known.map((f) => factItem(f, (li) => {
+      const del = document.createElement('button'); del.type = 'button'; del.className = 'mem-del';
+      del.setAttribute('aria-label', 'Delete this memory'); del.textContent = '✕';
+      del.addEventListener('click', async () => {
+        try { await forgetMindFact(f.id); li.remove(); toast('Forgotten.'); checkEmpty(); void refreshMind(); }
+        catch (error) { toast(friendlyError(error)); }
+      });
+      return del;
+    })));
+    checkEmpty();
+  } catch (error) { toast('Could not load memories: ' + friendlyError(error)); }
+}
+function checkEmpty() { $('#mem-empty').classList.toggle('hidden', $('#mem-list').children.length > 0); }
 
-  async function forgetPrivateProfile() {
-    if (!canSyncProfile()) return;
-    if (!confirm('Delete the profile saved on your private Mini server? Your local browser profile will remain.')) return;
-    $('#memory-forget').disabled = true;
+/* ---------- you ---------- */
+function fillYouForm() {
+  const p = state.profile || {};
+  $('#you-name').value = p.display_name || '';
+  $('#you-mini').value = p.mini_name || 'Mini';
+  $('#you-focus').value = p.focus || '';
+  $('#you-bound').value = p.boundaries || '';
+  for (const [name, val] of [['rel', p.companion_mode || 'friend'], ['tone', p.tone || 'balanced']]) {
+    const el = document.querySelector(`input[name="${name}"][value="${val}"]`);
+    if (el) el.checked = true;
+  }
+}
+
+/* ---------- install / service worker ---------- */
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator) || location.hostname === 'localhost') return;
+  window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(() => {}); });
+}
+function isStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+}
+function setupInstall() {
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault(); state.installPrompt = e;
+    $('#install-row').classList.remove('hidden');
+  });
+  if (ios && !isStandalone()) $('#install-row').classList.remove('hidden');
+  window.addEventListener('appinstalled', () => { $('#install-row').classList.add('hidden'); toast('Mini is on your home screen!'); });
+}
+
+/* ---------- wiring ---------- */
+function bindStatic() {
+  $$('[data-go]').forEach((b) => b.addEventListener('click', () => show(b.dataset.go)));
+  $('#btn-google').addEventListener('click', async () => {
+    try { await googleMiniLogin(); } catch (error) { toast(friendlyError(error)); }
+  });
+  $('#btn-email').addEventListener('click', () => { show('email'); setTimeout(() => $('#email-input').focus(), 60); });
+
+  let emailSent = false;
+  $('#email-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = $('#email-submit'); btn.disabled = true;
+    const email = $('#email-input').value.trim();
     try {
-      const res = await fetch('/api/voice/profile', { method: 'DELETE', credentials: 'same-origin' });
-      const result = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(result.error || result.detail || 'Delete failed');
-      await readMemoryStatus();
-      toast('Mini has deleted its private server profile.');
-    } catch (error) { toast('Could not delete server profile: ' + error.message); }
-    finally { updateMemoryUi(); }
-  }
+      if (!emailSent) {
+        await sendEmailMiniOtp(email);
+        emailSent = true;
+        $('#code-field').classList.remove('hidden');
+        btn.textContent = 'Sign in';
+        $('#email-hint').textContent = 'Check your inbox for a code from Mini. It can take a minute.';
+        setTimeout(() => $('#code-input').focus(), 60);
+      } else {
+        await verifyEmailMiniOtp(email, $('#code-input').value);
+      }
+    } catch (error) { toast(friendlyError(error)); }
+    finally { btn.disabled = false; }
+  });
 
-  function updateVoiceUi() {
-    const v = state.voiceStatus;
-    const status = canUseWorker()
-      ? 'FREE LOCAL SPEECH · CHATTERBOX + WHISPER + OLLAMA'
-      : v.workerReady ? 'VOICE WORKER READY · MINI VOICE NOT INSTALLED'
-      : 'BROWSER DEMO · LOCAL MODEL NOT CONNECTED';
-    text('#voice-engine-status', status);
-    text('#conversation-source-note', canUseWorker() ? '✳ Local Mini AI voice active: Whisper + Ollama + Chatterbox. This is turn-based, not continuous streaming.' : '✳ Mini’s voice is offline until the private voice worker is connected. You can still type.');
-    text('#voice-account-status', v.localStandalone ? 'Private local worker is running on this computer.'
-      : !v.authReady ? 'To use this from Vercel, deploy a private voice worker and configure Google owner authentication.'
-      : !v.ownerSignedIn ? 'Sign in to access your private voice worker.'
-      : !v.workerReady ? 'Owner signed in. Private voice worker is not reachable.'
-      : 'Private voice worker is connected.');
-    text('#voice-sample-status', v.referenceReady ? 'Mini’s voice is installed on the private worker.' : v.workerReady ? 'Mini’s voice is not installed on the private worker.' : 'Mini’s voice is on the private worker, which is not connected.');
-    text('#voice-engine-note', v.workerReady
-      ? 'Audio generation runs through the private Chatterbox model, with faster-whisper and local Ollama for complete speech turns. No ElevenLabs API used.'
-      : 'Run the Python worker on your computer, or link a securely hosted GPU worker. Mini does not download or export ElevenLabs voice weights.');
-    show('#voice-signin', !v.localStandalone && v.authReady && !v.ownerSignedIn);
-    show('#voice-logout', !v.localStandalone && v.ownerSignedIn);
-    $('#voice-test').disabled = !canUseWorker() || voiceGate.isBusy() || state.sendingVoice;
-    updateMemoryUi();
-    if (!state.recorder && !state.sendingVoice) {
-      text('#voice-helper', canUseWorker()
-        ? 'Tap to record · Private Whisper → Ollama → Mini’s voice'
-        : state.supaUser ? 'Secure realtime voice awaiting NFC gateway activation.'
-        : 'Mini’s voice needs the private worker. You can still type.');
-    }
-  }
+  $('#ob-next').addEventListener('click', () => void nextStep(false));
+  $('#ob-skip').addEventListener('click', () => void nextStep(true));
+  $('#ob-back').addEventListener('click', () => {
+    readStepValue();
+    if (state.step === 0) return void signOutMini().catch(() => {});
+    state.step--; renderStep();
+  });
+  $('#kids-signout').addEventListener('click', () => void signOutMini().catch(() => {}));
 
-  async function refreshVoiceStatus() {
+  $$('.tab').forEach((t) => t.addEventListener('click', () => setTab(t.dataset.tab)));
+  $('#mode-chip').addEventListener('click', () => {
+    if (state.session) return toast('End this conversation to switch.');
+    state.mode = state.mode === 'mentor' ? 'friend' : 'mentor';
+    updateModeChip();
+    toast(state.mode === 'mentor' ? 'Mentor mode: calm and practical' : 'Friend mode: warm and playful');
+  });
+
+  $('#talk-btn').addEventListener('click', () => { if (state.session) stopTalking(); else void startTalking(); });
+  $('#orb').addEventListener('click', () => {
+    if (!state.session) return void startTalking();
+    if ($('#orb').dataset.state === 'speaking') state.session.interrupt?.('user');
+  });
+
+  $('#mem-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const text = $('#mem-text').value.trim();
+    if (!text) return;
     try {
-      const res = await fetch('/api/voice/status', { credentials: 'same-origin', cache: 'no-store' });
-      if (!res.ok) throw new Error('Worker status unavailable');
-      const data = await res.json();
-      state.voiceStatus = {
-        authReady: Boolean(data.authReady),
-        ownerSignedIn: Boolean(data.ownerSignedIn),
-        workerReady: Boolean(data.workerReady),
-        referenceReady: Boolean(data.referenceReady),
-        localStandalone: Boolean(data.localStandalone),
-        voiceReady: Boolean(data.voiceReady ?? (data.workerReady && data.referenceReady))
-      };
-      updateVoiceUi();
-      if (canSyncProfile()) void readMemoryStatus();
-      if (state.voiceStatus.authReady && data.googleClientId) initGoogleButton(data.googleClientId);
-      if (state.voiceStatus.authReady && !state.voiceStatus.ownerSignedIn && state.supaUser?.id && !ownerLinkInFlight) void linkOwnerVoice();
-    } catch (_) {
-      state.voiceStatus = { authReady: false, ownerSignedIn: false, workerReady: false, referenceReady: false, localStandalone: false, voiceReady: false };
-      updateVoiceUi();
+      await tellMind({ kind: $('#mem-kind').value, text });
+      $('#mem-text').value = '';
+      toast("Got it, I'll remember that.");
+      void loadMemories();
+    } catch (error) { toast(friendlyError(error)); }
+  });
+
+  $('#you-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const p = state.profile || {};
+    const pick = (name) => document.querySelector(`input[name="${name}"]:checked`)?.value;
+    try {
+      await saveMiniProfile({
+        name: $('#you-name').value.trim(), miniName: $('#you-mini').value.trim() || 'Mini',
+        relationship: pick('rel') || 'friend', tone: pick('tone') || 'balanced',
+        focus: $('#you-focus').value.trim(), boundaries: $('#you-bound').value.trim(),
+        birthYear: p.birth_year ? String(p.birth_year) : undefined,
+      }, true);
+      state.profile = await readMiniProfile();
+      enterMain(); setTab('you');
+      toast('Saved. Mini will use this next time you talk.');
+    } catch (error) { toast('Could not save: ' + friendlyError(error)); }
+  });
+
+  $('#set-captions').addEventListener('change', (e) => { state.prefs.captions = e.target.checked; savePrefs(); applyCaptions(); });
+  $('#set-learn').addEventListener('change', async (e) => {
+    const on = e.target.checked;
+    try {
+      await setMindConsent('learn_from_conversations', on);
+      await setMindConsent('proactive_followups', on);
+      toast(on ? 'Mini will learn from your talks.' : "Mini won't learn from new talks. What it knows stays until you delete it.");
+    } catch (error) { e.target.checked = !on; toast(friendlyError(error)); }
+  });
+  $('#btn-signout').addEventListener('click', async () => {
+    stopTalking();
+    try { await signOutMini(); } catch (error) { toast(friendlyError(error)); }
+  });
+  $('#btn-delete').addEventListener('click', async () => {
+    if (!confirm('Delete your Mini account? Your profile and memories will be erased forever. This cannot be undone.')) return;
+    stopTalking();
+    try { await deleteMiniAccount(); toast('Your account was deleted.'); }
+    catch (error) { toast('Could not delete: ' + friendlyError(error)); }
+  });
+  $('#btn-install').addEventListener('click', async () => {
+    if (state.installPrompt) {
+      state.installPrompt.prompt();
+      await state.installPrompt.userChoice.catch(() => null);
+      state.installPrompt = null;
+    } else {
+      $('#sheet-install').classList.remove('hidden');
     }
-  }
-
-  let googleButtonInitialized = false;
-  function initGoogleButton(clientId) {
-    if (googleButtonInitialized || !clientId) return;
-    googleButtonInitialized = true;
-    const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.async = true; script.defer = true;
-    script.onload = () => {
-      try {
-        if (!window.google?.accounts?.id) throw new Error('Google client unavailable');
-        window.google.accounts.id.initialize({
-          client_id: clientId,
-          callback: async ({ credential }) => {
-            if (!credential) return;
-            try {
-              const response = await fetch('/api/auth/google', {
-                method: 'POST', credentials: 'same-origin',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ credential })
-              });
-              const result = await response.json();
-              if (!response.ok) throw new Error(result.error || 'Sign-in failed');
-              await refreshVoiceStatus();
-              toast('Signed in. You can now use your own secure voice worker if it is configured.');
-              if (Object.values(state.completed).some(Boolean)) enterHome();
-              else startSetup();
-            } catch (error) { toast('Google sign-in failed: ' + String(error.message).slice(0, 160)); }
-          }
-        });
-        const slot = $('#google-real-slot');
-        slot.replaceChildren();
-        window.google.accounts.id.renderButton(slot, { type: 'standard', theme: 'filled_black', size: 'large', text: 'continue_with', shape: 'pill', width: 320 });
-        show('#google-real-slot', true);
-        show('#google-signin', false);
-        text('#google-auth-hint', 'Google sign-in protects your self-hosted voice service on Vercel. It does not access your ElevenLabs account.');
-      } catch (_) { toast('Google sign-in could not load. Check OAuth origins.'); }
-    };
-    script.onerror = () => toast('Google sign-in scripts are blocked in this browser.');
-    document.head.append(script);
-  }
-
-  // The owner signs in once (Mini account via Supabase). The server checks
-  // that account and, only for the configured owner, unlocks private voice.
-  let ownerLinkInFlight = null;
-  function linkOwnerVoice({ announce = false } = {}) {
-    if (ownerLinkInFlight) return ownerLinkInFlight;
-    ownerLinkInFlight = (async () => {
-      try {
-        const { data } = await (miniIdentity()?.auth.getSession() ?? Promise.resolve({ data: null }));
-        const token = data?.session?.access_token;
-        if (!token) { if (announce) toast('Sign in to Mini first.'); return false; }
-        const res = await fetch('/api/auth/supabase-owner', {
-          method: 'POST', credentials: 'same-origin',
-          headers: { Authorization: 'Bearer ' + token }
-        });
-        const result = await res.json().catch(() => ({}));
-        if (!res.ok) { if (announce) toast(result.error || 'Private voice sign-in failed.'); return false; }
-        await refreshVoiceStatus();
-        if (announce) toast('Private Mini voice unlocked.');
-        return true;
-      } catch (_) {
-        if (announce) toast('Private voice sign-in failed. Please try again.');
-        return false;
-      } finally { ownerLinkInFlight = null; }
-    })();
-    return ownerLinkInFlight;
-  }
-
-  async function logoutOwner() {
-    try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }); } catch (_) {}
-    if (state.recorder?.state === 'recording') state.recorder.stop();
-    stopVoicePlayback();
-    await refreshVoiceStatus();
-    toast('Signed out from your private owner session.');
-  }
-
-  // Navigation
-  ['#header-start', '#hero-start', '#footer-start'].forEach((sel) => $(sel).addEventListener('click', begin));
-  $('#brand-home').addEventListener('click', (event) => { event.preventDefault(); screen('welcome'); });
-  // Demo mode is off in production: remove both demo entry points.
-  $('#hero-preview')?.remove();
-  $('#auth-back').addEventListener('click', () => screen('welcome'));
-  $$('.auth-tab').forEach((el) => el.addEventListener('click', () => selectAuth(el.dataset.authMethod)));
-  $('#google-signin').addEventListener('click', () => toast('Google login requires the OAuth client configured in Vercel. Continue in demo mode until then.'));
-  $('#auth-email').addEventListener('submit', emailFlow);
-  $('#auth-whatsapp').addEventListener('submit', whatsappFlow);
-  $('#continue-demo')?.remove();
-  $('#setup-back').addEventListener('click', () => { if (state.step === 0) screen('auth'); else { state.step--; renderQuestion(false); } });
-  $('#skip-question').addEventListener('click', () => saveStep(true));
-  $('#next-question').addEventListener('click', () => saveStep(false));
-  $('#listen-question').addEventListener('click', () => { void speak(questions[state.step].question); });
-  $('#speak-answer').addEventListener('click', () => listen('setup'));
-  $('#question-answer').addEventListener('input', updateSummary);
-  $$('[data-app-page]').forEach((el) => el.addEventListener('click', () => setPage(el.dataset.appPage)));
-  $('#finish-profile').addEventListener('click', () => { screen('setup'); state.step = state.completed.name ? 1 : 0; renderQuestion(false); });
-  $('#profile-edit').addEventListener('submit', saveProfile);
-  $$('.mode-switch [data-mode]').forEach((el) => el.addEventListener('click', () => {
-    state.mode = el.dataset.mode;
-    refreshHome();
-     toast(state.mode === 'mentor' ? 'Mentor mode · calm and practical' : 'Friend mode · warm and playful');
-  }));
-  $('#talk-button').addEventListener('click', () => {
-    if (state.supaUser && !canUseWorker()) return toast('Mini realtime voice is awaiting the private gateway. No demo speech is substituted.');
-    if (state.recorder || canUseWorker()) void toggleVoiceRecording(); else listen('home');
   });
-  $('#replay-reply').addEventListener('click', () => { if (state.lastAudioBase64 && canUseWorker()) void playLocalAudio(state.lastAudioBase64); else void speak(state.lastReply || 'Hey, I’m Mini. I’m right here. Tell me what’s on your mind.'); });
-  $('#stop-speaking').addEventListener('click', () => {
-    miniLive.interrupt();
-    if (state.recorder) {
-      state.discardNextRecording = true;
-      state.recorder.stop();
-    }
-    if (state.recognizer) state.recognizer.abort();
-    if (voiceGate.isBusy()) state.suppressPendingVoice = true;
-    stopVoicePlayback();
-    text('#voice-state', voiceGate.isBusy() ? 'Mini is still processing; its response will be muted.' : 'Ready when you are.');
-  });
-  $('#type-toggle').addEventListener('click', () => {
-    const form = $('#type-form'); form.classList.toggle('hidden');
-    text('#type-toggle span', form.classList.contains('hidden') ? 'Open text input ↓' : 'Close text input ↑');
-    if (!form.classList.contains('hidden')) $('#type-input').focus();
-  });
-  $('#type-form').addEventListener('submit', (event) => { event.preventDefault(); handleMessage($('#type-input').value); });
-  $('#toggle-captions').addEventListener('click', () => { state.captions = !state.captions; refreshHome(); });
-  $('#show-captions').addEventListener('change', (event) => { state.captions = event.target.checked; refreshHome(); });
-  $('#voice-output').addEventListener('change', (event) => {
-    state.voiceOutput = event.target.checked;
-    if (!state.voiceOutput) {stopVoicePlayback(); miniLive.stop();}
-  });
-  $('#voice-signin').addEventListener('click', () => { if (state.supaUser?.id) void linkOwnerVoice({ announce: true }); else begin(); });
-  $('#voice-logout').addEventListener('click', () => void logoutOwner());
-  $('#voice-test').addEventListener('click', () => void speak('Hey, I’m Mini. This is my voice. How does it sound?'));
-  $('#memory-save').addEventListener('click', () => void syncPrivateProfile());
-  $('#memory-forget').addEventListener('click', () => void forgetPrivateProfile());
-  $('#clear-local').addEventListener('click', resetData);
-  $('#sidebar-reset').addEventListener('click', resetData);
+  $('#sheet-close').addEventListener('click', () => $('#sheet-install').classList.add('hidden'));
 
-  // Real-time voice uses the existing profile's Friend/Mentor mode and the
-  // same verified Supabase identity, but NOT the owner-only preview cookie.
-  // The stream remains disabled until a separate protected NFC gateway is ready.
-  const miniLive = createMiniRealtimeUI({getMode:()=>state.mode, onNotice:toast});
+  // Never keep the microphone open in the background.
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') stopTalking(); });
+  window.addEventListener('pagehide', stopTalking);
+}
 
-  // Do not auto-hydrate private demo data before identifying the signed-in
-  // account; demo answers can be loaded only by explicitly entering demo mode.
-   selectAuth('google');
-  void installMiniAccountUI({
-    onVerified: () => startSetup(),
-    onState: (user) => {
-      // A different verified account must never inherit a previous demo user's
-      // local answers, including after a Google redirect or a shared computer.
-      if (user?.id && user.id !== state.supaUser?.id) {
-        try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
-        state.profile = { ...defaults };
-        state.completed = {};
-        state.hasTalked = false;
-        state.lastReply = '';
-        refreshProfilePreview();
-        refreshHome();
-      }
-      const newlySignedIn = Boolean(user?.id) && !state.supaUser?.id;
-      state.supaUser = user;
-      // After Google/email sign-in (including the OAuth redirect back), go
-      // straight to onboarding step 1 unless the saved profile already has a name.
-      if (newlySignedIn && !state.completed.name) startSetup();
-      void miniLive.setUser(user);
-      if (user?.id && state.voiceStatus.authReady && !state.voiceStatus.ownerSignedIn) void linkOwnerVoice();
-      updateMemoryUi();
-    },
-    getProfile: () => ({ profile: state.profile, completed: state.completed }),
-    onProfileLoaded: (record) => {
-      const saved = {
-        name: record.display_name, miniName: record.mini_name,
-        relationship: record.companion_mode, tone: record.tone,
-        focus: record.focus, boundaries: record.boundaries
-      };
-      state.profile = { ...defaults };
-      state.completed = {};
-      const answered = new Set(Array.isArray(record.completed_keys) ? record.completed_keys : []);
-      for (const key of Object.keys(defaults)) {
-        if (typeof saved[key] === 'string' && saved[key].trim()) {
-          state.profile[key] = saved[key];
-          if (answered.has(key)) state.completed[key] = true;
-        }
-      }
-      refreshProfilePreview();
-      refreshHome();
-    },
-    onSignOut: async () => {
-      miniLive.stop();
-      await miniLive.setUser(null);
-      // Sign out the legacy owner-only cookie as well if present.
-      try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }); } catch (_) {}
-      try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
-      state.profile = { ...defaults }; state.completed = {}; state.hasTalked = false;
-      screen('welcome');
-    },
-    notify: toast
-  }).catch(error => toast('Account connection unavailable: ' + String(error.message).slice(0,100)));
-  void refreshVoiceStatus();
-  refreshProfilePreview();
-  refreshHome();
-})();
+void boot();

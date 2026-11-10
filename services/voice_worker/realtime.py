@@ -18,6 +18,7 @@ import os
 import struct
 import time
 import uuid
+from datetime import datetime, timezone
 from typing import AsyncGenerator
 
 import httpx
@@ -25,7 +26,7 @@ import numpy as np
 import torch
 from fastapi import WebSocket, WebSocketDisconnect
 
-from . import engine, memory, resource_limits, ws_auth
+from . import admission, engine, memory, mind, resource_limits, ws_auth
 
 logger = logging.getLogger("mini.realtime")
 
@@ -115,6 +116,38 @@ def split_clause(buffer: str, *, first: bool) -> tuple[str, str] | None:
     return None
 
 
+async def fetch_user_context(access_token: str, user_id: str) -> list[str]:
+    """This user's own profile and memories, read with THEIR token (RLS)."""
+    supabase_url = os.environ.get("MINI_SUPABASE_URL", "https://gkdaxtnlwojggdqitsex.supabase.co").rstrip("/")
+    key = os.environ.get("MINI_SUPABASE_PUBLISHABLE_KEY", "")
+    if not key or not access_token:
+        return []
+    headers = {"Authorization": f"Bearer {access_token}", "apikey": key}
+    facts: list[str] = []
+    try:
+        async with httpx.AsyncClient(timeout=5.0, trust_env=False) as client:
+            prof = await client.get(f"{supabase_url}/rest/v1/mini_profiles", headers=headers, params={
+                "select": "display_name,mini_name,companion_mode,tone,focus,boundaries",
+                "user_id": f"eq.{user_id}", "limit": "1"})
+            mems = await client.get(f"{supabase_url}/rest/v1/mini_memories", headers=headers, params={
+                "select": "kind,content", "user_id": f"eq.{user_id}",
+                "or": "(expires_at.is.null,expires_at.gt.now())",
+                "order": "updated_at.desc", "limit": "20"})
+        if prof.status_code == 200 and prof.json():
+            row = prof.json()[0]
+            labels = {"display_name": "Call the user", "mini_name": "Your name is", "companion_mode": "Preferred mode",
+                      "tone": "Preferred tone", "focus": "Current focus", "boundaries": "Boundaries to respect"}
+            facts += [f"{labels[k]}: {str(v)[:300]}" for k, v in row.items() if k in labels and v]
+        if mems.status_code == 200:
+            facts += [f"{m.get('kind', 'fact')}: {str(m.get('content', ''))[:300]}" for m in mems.json() if m.get("content")]
+    except Exception as exc:
+        logger.warning("Could not load user context: %s", type(exc).__name__)
+    return facts[:30]
+
+
+_LEARNING_TASKS: set = set()
+
+
 class SileroVADDetector:
     def __init__(self, model):
         self.model = model
@@ -194,17 +227,27 @@ class MiniRealtimeSession:
         self.conversation_history: list[dict] = []
         self.unanswered_transcript = ""
         self.reply_audio_started = False
+        self.client_ip = ""
+        self.profile_facts: list[str] = []
+        self.admission_task: asyncio.Task | None = None
+        self.watchdog_task: asyncio.Task | None = None
+        self.holds_floor = False
+        self.ready_at: float | None = None
+        self.last_activity = time.monotonic()
+        self.usage_recorded = False
+        self.mind_pkg: dict | None = None
+        self.mind_client: mind.MindClient | None = None
+        self.started_wall: datetime | None = None
 
     def owner_profile_facts(self) -> list[str]:
-        """Profile facts allowed in this session's prompt.
+        """Facts allowed in this session's prompt.
 
-        The SQLite profile is the single-owner pilot store, not per-account
-        memory. It is used ONLY for the loopback owner session; verified
-        Supabase accounts get no shared profile until per-user, RLS-scoped
-        memory is wired to the worker.
+        Supabase accounts get ONLY their own profile and memories (loaded at
+        session.start with their token, so row-level security applies). The
+        SQLite single-owner profile is used only for the loopback dev session.
         """
         if self.user_id != "local-dev-owner":
-            return []
+            return list(self.profile_facts)
         profile_data = memory.get_profile()
         if not (profile_data.get("saved") and profile_data.get("profile")):
             return []
@@ -278,11 +321,26 @@ class MiniRealtimeSession:
                 await self.ws.close(code=4401, reason="Unauthorized")
                 return
 
+            if self.user_id or self.admission_task:
+                return  # session.start only once per connection
             self.user_id = user["id"]
             self.mode = "mentor" if event.get("mode") == "mentor" else "friend"
-            self.is_ready = True
-            await self.send_json({"type": "session.ready"})
-            logger.info("Session ready for user %s in %s mode", self.user_id, self.mode)
+            if not await self.check_limits():
+                return
+            if self.user_id == "local-dev-owner" and os.environ.get("MINI_DEV_MIND_PACKAGE"):
+                # loopback test sessions only: a sample mind package from a file (never learns)
+                try:
+                    with open(os.environ["MINI_DEV_MIND_PACKAGE"], encoding="utf-8") as fh:
+                        self.mind_pkg = json.load(fh)
+                except (OSError, ValueError) as exc:
+                    logger.warning("dev mind package unreadable: %s", exc)
+            if self.user_id != "local-dev-owner":
+                self.mind_client = mind.MindClient(access_token, self.user_id)
+                self.mind_pkg = await self.mind_client.load_package()
+                if not (self.mind_pkg or {}).get("known"):
+                    # mind not available yet: fall back to the plain profile
+                    self.profile_facts = await fetch_user_context(access_token, self.user_id)
+            self.admission_task = asyncio.create_task(self.wait_for_floor())
 
         elif event_type == "playback.progress":
             resp_id = event.get("response_id")
@@ -297,6 +355,85 @@ class MiniRealtimeSession:
         elif event_type == "session.end":
             self.cleanup()
             await self.ws.close(code=1000, reason="Session ended by client")
+
+    async def end_session(self, reason: str, message: str, code: int = 1000):
+        await self.send_json({"type": "session.ending", "reason": reason, "message": message})
+        self.cleanup()
+        try:
+            await self.ws.close(code=code, reason=reason[:60])
+        except Exception:
+            pass
+
+    async def check_limits(self) -> bool:
+        """Start-rate and daily allowance; the dev loopback owner is exempt."""
+        if self.user_id == "local-dev-owner":
+            return True
+        if not admission.STARTS.allow(self.user_id, limit=6, window_s=60):
+            await self.end_session("rate_limited", "Too many attempts. Please wait a minute and try again.", 4429)
+            return False
+        if admission.USAGE.remaining(self.user_id) < 15:
+            minutes = admission.daily_seconds() // 60
+            await self.end_session("daily_limit", f"You've used today's {minutes} minutes with Mini. "
+                                   "Come back tomorrow!", 4429)
+            return False
+        return True
+
+    async def wait_for_floor(self):
+        async def report(position: int):
+            await self.send_json({"type": "session.queued", "position": position,
+                                  "message": "Mini is talking with someone else. You're next in line."
+                                  if position == 1 else f"Mini is busy. You're number {position} in line."})
+        try:
+            if not await admission.FLOOR.acquire(self.session_id, report):
+                await self.end_session("queue_full", "Mini is very busy right now. Please try again in a few minutes.", 4429)
+                return
+            self.holds_floor = True
+            if self.closed:
+                admission.FLOOR.release(self.session_id)
+                return
+            self.ready_at = time.monotonic()
+            self.last_activity = self.ready_at
+            self.is_ready = True
+            limits = {"max_seconds": admission.max_session_seconds(), "idle_seconds": admission.idle_seconds()}
+            if self.user_id != "local-dev-owner":
+                limits["remaining_today_seconds"] = int(admission.USAGE.remaining(self.user_id))
+            sync = (self.mind_pkg or {}).get("sync") or {}
+            await self.send_json({"type": "session.ready", "limits": limits,
+                                  "sync": {"score": sync.get("score")} if sync else None})
+            self.started_wall = datetime.now(timezone.utc)
+            self.watchdog_task = asyncio.create_task(self.watchdog())
+            if (self.mind_pkg or {}).get("known") and os.environ.get("MINI_SPEAK_FIRST", "1") == "1":
+                # Like a friend who missed them: Mini opens the conversation.
+                self.response_task = asyncio.create_task(
+                    self.generate_and_stream_response(mind.opening_instruction(self.mind_pkg), opening=True))
+            logger.info("Session %s ready in %s mode (queue now %d)", self.session_id, self.mode,
+                        admission.FLOOR.waiting)
+        except asyncio.CancelledError:
+            pass
+
+    def busy_speaking(self) -> bool:
+        return bool(self.current_response_id) or bool(self.vad_detector and self.vad_detector.is_speech_active)
+
+    async def watchdog(self):
+        try:
+            while not self.closed:
+                await asyncio.sleep(1)
+                now = time.monotonic()
+                if self.busy_speaking():
+                    self.last_activity = now
+                elapsed = now - (self.ready_at or now)
+                if elapsed >= admission.max_session_seconds():
+                    await self.end_session("time_limit", "That's our time for this conversation. Start a new one anytime!")
+                    return
+                if now - self.last_activity >= admission.idle_seconds():
+                    await self.end_session("idle", "I'll hang up for now since it's quiet. Tap to talk again anytime.")
+                    return
+                if (self.user_id != "local-dev-owner"
+                        and elapsed >= admission.USAGE.remaining(self.user_id)):
+                    await self.end_session("daily_limit", "You've used today's time with Mini. Come back tomorrow!")
+                    return
+        except asyncio.CancelledError:
+            pass
 
     async def handle_audio_frame(self, frame_bytes: bytes):
         if not self.is_ready or self.closed:
@@ -391,7 +528,7 @@ class MiniRealtimeSession:
         self.reply_audio_started = False
         self.response_task = asyncio.create_task(self.generate_and_stream_response(transcript))
 
-    async def generate_and_stream_response(self, user_transcript: str):
+    async def generate_and_stream_response(self, user_transcript: str, opening: bool = False):
         response_id = f"resp_{uuid.uuid4().hex[:12]}"
         self.current_response_id = response_id
         self.last_played_ms = 0
@@ -413,7 +550,7 @@ class MiniRealtimeSession:
                         raise
                     await asyncio.sleep(0.2)
             try:
-                await self._run_llm_and_tts(response_id, user_transcript)
+                await self._run_llm_and_tts(response_id, user_transcript, opening=opening)
             finally:
                 slot.__exit__(None, None, None)
         except resource_limits.VoiceBusy:
@@ -436,7 +573,7 @@ class MiniRealtimeSession:
             if self.current_response_id == response_id:
                 self.current_response_id = None
 
-    async def _run_llm_and_tts(self, response_id: str, user_transcript: str):
+    async def _run_llm_and_tts(self, response_id: str, user_transcript: str, opening: bool = False):
         """Stream LLM text into a clause queue while a separate task voices it.
 
         The LLM never waits for speech synthesis. The first clause is cut
@@ -447,9 +584,13 @@ class MiniRealtimeSession:
         """
         t_start = time.perf_counter()
         system_prompt = engine.PROMPTS.get(self.mode, engine.PROMPTS["friend"])
-        details = self.owner_profile_facts()
-        if details:
-            system_prompt += "\nUser profile facts:\n" + "\n".join(details)
+        mind_block = mind.render_prompt(self.mind_pkg)
+        if mind_block:
+            system_prompt += "\n" + mind_block
+        else:
+            details = self.owner_profile_facts()
+            if details:
+                system_prompt += "\nUser profile facts:\n" + "\n".join(details)
         messages = [
             {"role": "system", "content": system_prompt},
             *self.conversation_history[-6:],
@@ -500,6 +641,11 @@ class MiniRealtimeSession:
                             break
             if buffer.strip() and response_id not in self.cancelled_response_ids:
                 clauses.put_nowait(buffer.strip())
+            extra = engine.crisis_followup(user_transcript, "".join(full_reply))
+            if extra and response_id not in self.cancelled_response_ids:
+                full_reply.append(" " + extra)
+                await self.send_json({"type": "response.text.delta", "response_id": response_id, "text": " " + extra})
+                clauses.put_nowait(extra)
         finally:
             clauses.put_nowait(None)
             if response_id in self.cancelled_response_ids:
@@ -511,7 +657,8 @@ class MiniRealtimeSession:
 
         if response_id not in self.cancelled_response_ids:
             complete_text = "".join(full_reply).strip()
-            self.conversation_history.append({"role": "user", "content": user_transcript})
+            if not opening:
+                self.conversation_history.append({"role": "user", "content": user_transcript})
             self.conversation_history.append({"role": "assistant", "content": complete_text})
             total_ms = round((time.perf_counter() - t_start) * 1000)
             await self.send_json({"type": "pipeline.timing", "response_id": response_id, **timing, "total_ms": total_ms})
@@ -592,7 +739,55 @@ class MiniRealtimeSession:
             await asyncio.shield(worker)
 
     def cleanup(self):
+        if self.admission_task and not self.admission_task.done():
+            self.admission_task.cancel()
+        if self.watchdog_task and not self.watchdog_task.done() and self.watchdog_task is not asyncio.current_task():
+            self.watchdog_task.cancel()
+        if self.holds_floor:
+            self.holds_floor = False
+            admission.FLOOR.release(self.session_id)
+        if self.ready_at and not self.usage_recorded and self.user_id and self.user_id != "local-dev-owner":
+            self.usage_recorded = True
+            try:
+                admission.USAGE.add(self.user_id, time.monotonic() - self.ready_at)
+            except Exception as exc:
+                logger.warning("Could not record usage: %s", exc)
+        already_closed = self.closed
         self.closed = True
         if self.response_task and not self.response_task.done():
             self.response_task.cancel()
         self.is_ready = False
+        if not already_closed:
+            self.schedule_learning()
+
+    def schedule_learning(self):
+        """After the conversation, Mini looks back and learns (in the background)."""
+        turns = sum(1 for t in self.conversation_history if t["role"] == "user")
+        if (not self.mind_client or not self.started_wall or turns == 0
+                or os.environ.get("MINI_MIND_LEARN", "1") != "1"):
+            return
+        history, pkg, started = list(self.conversation_history), self.mind_pkg, self.started_wall
+        client, sid = self.mind_client, self.session_id
+        self.conversation_history = []   # the transcript is never kept beyond this
+
+        async def learn():
+            ended = datetime.now(timezone.utc)
+            try:
+                # Learn only while nobody is talking to Mini, without holding the voice
+                # slot, so a new conversation is never blocked by background learning.
+                deadline = time.monotonic() + 1800
+                while admission.FLOOR.holder is not None or resource_limits.busy():
+                    if time.monotonic() > deadline:
+                        logger.warning("mind: learning skipped for %s (Mini busy for 30 min)", sid)
+                        return
+                    await asyncio.sleep(3)
+                learned = await mind.extract(history, threads=int(os.environ.get("MINI_MIND_THREADS") or 8),
+                                             keep_alive=engine.ollama_keep_alive())
+                counts = await client.learn(learned, pkg, started, ended, turns)
+                logger.info("mind: learned after %s: %s", sid, counts)
+            except Exception as exc:
+                logger.warning("mind: learning failed for %s: %s", sid, str(exc)[:200])
+
+        task = asyncio.get_running_loop().create_task(learn())
+        _LEARNING_TASKS.add(task)
+        task.add_done_callback(_LEARNING_TASKS.discard)

@@ -1,0 +1,179 @@
+{
+  "stage": 7,
+  "code": "senior_adulthood",
+  "title": "Senior adulthood",
+  "min_age": 65,
+  "max_age": 79,
+  "theme": "Wellbeing and meaningful living",
+  "persona": {
+    "voice": "A cheerful, patient companion who loves their stories and keeps them company; kind, never patronising.",
+    "pace": "Slower, clear speech; one question at a time; happy to listen to long stories.",
+    "lean_into": [
+      "memories and life stories",
+      "grandchildren and family news",
+      "daily routines and hobbies",
+      "friends and community"
+    ],
+    "avoid": [
+      "talking down",
+      "rushing them",
+      "medical advice"
+    ],
+    "motivation_style": "Delight in their day; gently encourage staying connected and active.",
+    "story_style": "Gentle stories that link today with their favourite memories."
+  },
+  "focus": [
+    {
+      "item": "Retirement lifestyle",
+      "groups": [
+        16,
+        17
+      ],
+      "fields": [
+        "morning_routine",
+        "weekend_activities",
+        "personal_rituals"
+      ],
+      "questions": [
+        "What does a typical day look like for you now?",
+        "What's your favourite part of the day?"
+      ]
+    },
+    {
+      "item": "Health management",
+      "groups": [
+        3
+      ],
+      "fields": [
+        "general_wellbeing",
+        "sleep_quality",
+        "medical_appointments"
+      ],
+      "sensitive": true,
+      "questions": [
+        "How are you feeling today?",
+        "Did you sleep well last night?"
+      ]
+    },
+    {
+      "item": "Social connections",
+      "groups": [
+        10,
+        26
+      ],
+      "fields": [
+        "friends",
+        "social_activities",
+        "community_membership",
+        "social_support_availability"
+      ],
+      "questions": [
+        "Who did you talk to or see this week?",
+        "Do you have friends you meet regularly?"
+      ]
+    },
+    {
+      "item": "Family relationships",
+      "groups": [
+        9,
+        10
+      ],
+      "fields": [
+        "children",
+        "grandparents",
+        "family_relationships",
+        "important_birthdays"
+      ],
+      "questions": [
+        "Tell me about your family. Who's who?",
+        "Any family birthdays or visits coming up?"
+      ]
+    },
+    {
+      "item": "Hobbies",
+      "groups": [
+        17,
+        18
+      ],
+      "fields": [
+        "gardening",
+        "music",
+        "favourite_shows",
+        "favourite_books"
+      ],
+      "questions": [
+        "What do you enjoy doing in your free time?",
+        "What music or shows do you love?"
+      ]
+    },
+    {
+      "item": "Financial management",
+      "groups": [
+        15
+      ],
+      "fields": [
+        "monthly_expenses",
+        "financial_commitments"
+      ],
+      "sensitive": true,
+      "only_if_user_raises": true,
+      "questions": [
+        "Is there anything you'd like help keeping track of?"
+      ]
+    },
+    {
+      "item": "Accessibility",
+      "groups": [
+        1,
+        2,
+        7,
+        26
+      ],
+      "fields": [
+        "accessibility_requirements",
+        "hearing_accessibility",
+        "vision_accessibility",
+        "preferred_speaking_speed"
+      ],
+      "questions": [
+        "Is my voice easy to hear? Should I talk slower or louder?",
+        "Is there anything that makes using your phone tricky?"
+      ]
+    },
+    {
+      "item": "Life experiences",
+      "groups": [
+        11,
+        29
+      ],
+      "fields": [
+        "memorable_experiences",
+        "personal_stories",
+        "travel_history",
+        "places_lived"
+      ],
+      "questions": [
+        "Where did you grow up? What was it like?",
+        "What's a moment from your life you'll never forget?"
+      ]
+    },
+    {
+      "item": "Knowledge sharing",
+      "groups": [
+        13,
+        29,
+        6,
+        11
+      ],
+      "fields": [
+        "areas_of_expertise",
+        "lessons_learned",
+        "stories_they_want_preserved"
+      ],
+      "questions": [
+        "What's the best advice you've ever been given?",
+        "What could you teach me about?"
+      ]
+    }
+  ]
+}

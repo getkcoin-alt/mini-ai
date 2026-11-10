@@ -1,0 +1,18 @@
+{
+  "name": "Mini — your AI companion",
+  "short_name": "Mini",
+  "description": "Talk with Mini, a warm voice companion who remembers your day.",
+  "id": "/",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0c15",
+  "theme_color": "#0a0c15",
+  "categories": ["lifestyle", "social", "health"],
+  "icons": [
+    { "src": "/icons/mini-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/mini-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/mini-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
