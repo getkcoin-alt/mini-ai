@@ -2,9 +2,11 @@ import os
 import unittest
 from unittest.mock import patch
 
-import numpy as np
-
-from services.voice_worker import acks, realtime
+try:  # CI's sanity job runs without the heavy voice stack (numpy/torch)
+    import numpy as np
+    from services.voice_worker import acks, realtime
+except ImportError as exc:  # pragma: no cover
+    raise unittest.SkipTest(f"voice stack not installed: {exc}")
 
 
 class AckTests(unittest.TestCase):
