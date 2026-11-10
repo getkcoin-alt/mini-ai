@@ -26,7 +26,7 @@ import numpy as np
 import torch
 from fastapi import WebSocket, WebSocketDisconnect
 
-from . import acks, admission, engine, memory, mind, resource_limits, ws_auth
+from . import acks, admission, cloud, engine, infra, memory, mind, resource_limits, ws_auth
 
 logger = logging.getLogger("mini.realtime")
 
@@ -282,6 +282,10 @@ class MiniRealtimeSession:
         self.mind_pkg: dict | None = None
         self.mind_client: mind.MindClient | None = None
         self.started_wall: datetime | None = None
+        # Where this session's models run (super admin: local or api; see infra.py).
+        self.plan: dict = {"chosen": "local", "stt": "local", "llm": "local", "tts": "local",
+                           "llm_provider": "groq", "llm_model": "", "overridden": False}
+        self.holds_api_slot = False
 
     def owner_profile_facts(self) -> list[str]:
         """Facts allowed in this session's prompt.
@@ -368,6 +372,11 @@ class MiniRealtimeSession:
             if self.user_id or self.admission_task:
                 return  # session.start only once per connection
             self.user_id = user["id"]
+            try:
+                self.plan = infra.resolve(user.get("email") if self.user_id != "local-dev-owner"
+                                          else os.environ.get("MINI_DEV_INFRA_EMAIL"))
+            except Exception as exc:  # a broken settings file must never block a conversation
+                logger.warning("infra plan unavailable, using local: %s", type(exc).__name__)
             self.mode = "mentor" if event.get("mode") == "mentor" else "friend"
             if not await self.check_limits():
                 return
@@ -428,12 +437,31 @@ class MiniRealtimeSession:
                                   "message": "Mini is talking with someone else. You're next in line."
                                   if position == 1 else f"Mini is busy. You're number {position} in line."})
         try:
-            if not await admission.FLOOR.acquire(self.session_id, report):
+            if not infra.uses_api(self.plan) and admission.FLOOR.holder is not None \
+                    and infra.api_fully_ready(self.plan):
+                # Our server is busy with someone else: talk on the API instead of queueing.
+                self.plan = infra.as_api(self.plan)
+                infra.record("fallback", "session", "api", "local busy")
+            if infra.uses_api(self.plan):
+                if infra.claim_api_session():
+                    self.holds_api_slot = True
+                else:
+                    infra.record("fallback", "session", "local", "api session limit")
+                    self.plan = {**self.plan, "stt": "local", "llm": "local", "tts": "local"}
+            if self.holds_api_slot:
+                pass  # API sessions do not need the single local conversation floor
+            elif not await admission.FLOOR.acquire(self.session_id, report):
                 await self.end_session("queue_full", "Mini is very busy right now. Please try again in a few minutes.", 4429)
                 return
-            self.holds_floor = True
+            if not self.holds_api_slot:
+                self.holds_floor = True
             if self.closed:
-                admission.FLOOR.release(self.session_id)
+                if self.holds_floor:
+                    self.holds_floor = False
+                    admission.FLOOR.release(self.session_id)
+                if self.holds_api_slot:
+                    self.holds_api_slot = False
+                    infra.release_api_session()
                 return
             self.ready_at = time.monotonic()
             self.last_activity = self.ready_at
@@ -450,7 +478,8 @@ class MiniRealtimeSession:
                 # Like a friend who missed them: Mini opens the conversation.
                 self.response_task = asyncio.create_task(
                     self.generate_and_stream_response(mind.opening_instruction(self.mind_pkg), opening=True))
-            logger.info("Session %s ready in %s mode (queue now %d)", self.session_id, self.mode,
+            logger.info("Session %s ready (stt=%s llm=%s/%s tts=%s; queue now %d)", self.session_id,
+                        self.plan["stt"], self.plan["llm"], self.plan["llm_provider"], self.plan["tts"],
                         admission.FLOOR.waiting)
         except asyncio.CancelledError:
             pass
@@ -531,7 +560,14 @@ class MiniRealtimeSession:
                 segments, _ = live_whisper().transcribe(audio_samples, beam_size=1, vad_filter=False)
                 return " ".join(seg.text.strip() for seg in segments).strip()
 
-        transcript = await loop.run_in_executor(None, _do_stt)
+        transcript = None
+        if self.plan["stt"] == "api":
+            try:
+                transcript = await cloud.transcribe(audio_samples)
+            except cloud.ProviderError as exc:
+                infra.record("fallback", "stt", "groq", str(exc))
+        if transcript is None:
+            transcript = await loop.run_in_executor(None, _do_stt)
         stt_ms = (time.perf_counter() - t0) * 1000
         logger.info("STT final: %s in %.1f ms", _private(transcript), stt_ms)
 
@@ -644,45 +680,31 @@ class MiniRealtimeSession:
                 # A tiny "Mm-hmm"/"Oh nice!" in Mini's voice while the reply is made.
                 clauses.put_nowait(ack[1])
         try:
-            async with httpx.AsyncClient(timeout=60.0, trust_env=False) as client:
-                async with client.stream("POST", f"{ollama_url}/api/chat", json={
-                    "model": os.environ.get("MINI_OLLAMA_MODEL", "llama3.2:1b"),
-                    "messages": messages,
-                    "stream": True,
-                    "keep_alive": engine.ollama_keep_alive(),
-                    "options": {"num_predict": REPLY_TOKENS, "temperature": 0.6, "num_ctx": 2048,
-                                "num_thread": engine.llm_threads()},
-                }) as stream_resp:
-                    async for line in stream_resp.aiter_lines():
-                        if response_id in self.cancelled_response_ids:
-                            return
-                        if not line:
-                            continue
-                        try:
-                            chunk_json = json.loads(line)
-                        except Exception:
-                            continue
-                        delta = chunk_json.get("message", {}).get("content", "")
-                        if delta:
-                            if timing["llm_first_token_ms"] is None:
-                                timing["llm_first_token_ms"] = round((time.perf_counter() - t_start) * 1000)
-                            full_reply.append(delta)
-                            buffer += delta
-                            cut = split_clause(buffer, first=clauses_sent == 0)
-                            if cut:
-                                clause, buffer = cut
-                                # On-screen text follows what Mini actually says (never cut-off words).
-                                await self.send_json({"type": "response.text.delta", "response_id": response_id,
-                                                      "text": (" " if clauses_sent else "") + clause})
-                                clauses.put_nowait(clause)
-                                clauses_sent += 1
-                                spoken.append(clause)
-                                if reply_is_complete(spoken):
-                                    # Hard cap: stop the model; closing the stream ends generation.
-                                    capped = True
-                                    break
-                        if chunk_json.get("done", False):
-                            break
+            deltas = self._llm_deltas(messages, ollama_url)
+            try:
+                async for delta in deltas:
+                    if response_id in self.cancelled_response_ids:
+                        return
+                    if delta:
+                        if timing["llm_first_token_ms"] is None:
+                            timing["llm_first_token_ms"] = round((time.perf_counter() - t_start) * 1000)
+                        full_reply.append(delta)
+                        buffer += delta
+                        cut = split_clause(buffer, first=clauses_sent == 0)
+                        if cut:
+                            clause, buffer = cut
+                            # On-screen text follows what Mini actually says (never cut-off words).
+                            await self.send_json({"type": "response.text.delta", "response_id": response_id,
+                                                  "text": (" " if clauses_sent else "") + clause})
+                            clauses.put_nowait(clause)
+                            clauses_sent += 1
+                            spoken.append(clause)
+                            if reply_is_complete(spoken):
+                                # Hard cap: stop the model; closing the stream ends generation.
+                                capped = True
+                                break
+            finally:
+                await deltas.aclose()
             if capped:
                 full_reply = [" ".join(spoken)]
             elif buffer.strip() and response_id not in self.cancelled_response_ids:
@@ -713,6 +735,42 @@ class MiniRealtimeSession:
             await self.send_json({"type": "response.finished", "response_id": response_id})
             logger.info("Response %s: ack=%sms llm_first=%sms first_audio=%sms total=%sms %s", response_id,
                         timing["ack_ms"], timing["llm_first_token_ms"], timing["first_audio_ms"], total_ms, _private(complete_text))
+
+    async def _llm_deltas(self, messages: list[dict], ollama_url: str):
+        """Reply text deltas from the planned LLM; the local model if the API fails before speaking."""
+        if self.plan["llm"] == "api":
+            produced = False
+            try:
+                async for delta in cloud.chat_stream(self.plan["llm_provider"], self.plan["llm_model"], messages,
+                                                     max_tokens=REPLY_TOKENS):
+                    produced = True
+                    yield delta
+                return
+            except cloud.ProviderError as exc:
+                infra.record("fallback", "llm", self.plan["llm_provider"], str(exc))
+                if produced:
+                    return  # half a reply already spoken; do not start a second one
+        async with httpx.AsyncClient(timeout=60.0, trust_env=False) as client:
+            async with client.stream("POST", f"{ollama_url}/api/chat", json={
+                "model": os.environ.get("MINI_OLLAMA_MODEL", "llama3.2:1b"),
+                "messages": messages,
+                "stream": True,
+                "keep_alive": engine.ollama_keep_alive(),
+                "options": {"num_predict": REPLY_TOKENS, "temperature": 0.6, "num_ctx": 2048,
+                            "num_thread": engine.llm_threads()},
+            }) as stream_resp:
+                async for line in stream_resp.aiter_lines():
+                    if not line:
+                        continue
+                    try:
+                        chunk_json = json.loads(line)
+                    except Exception:
+                        continue
+                    delta = chunk_json.get("message", {}).get("content", "")
+                    if delta:
+                        yield delta
+                    if chunk_json.get("done", False):
+                        return
 
     async def _speak_clauses(self, response_id: str, stream_id: int, clauses: asyncio.Queue,
                              timing: dict, t_start: float):
@@ -763,6 +821,19 @@ class MiniRealtimeSession:
         is synthesized first.
         """
         loop = asyncio.get_running_loop()
+        if self.plan["tts"] == "api":
+            produced = False
+            try:
+                async for samples in cloud.speak_stream(clause):
+                    if self.closed or response_id in self.cancelled_response_ids:
+                        return
+                    produced = True
+                    yield samples
+                return
+            except cloud.ProviderError as exc:
+                infra.record("fallback", "tts", "resemble", str(exc))
+                if produced:
+                    return
         if os.environ.get("MINI_STREAMING_TTS", "0") != "1":
             samples, _rate = await loop.run_in_executor(None, engine.synthesize_samples, clause, "en")
             yield samples
@@ -806,6 +877,9 @@ class MiniRealtimeSession:
         if self.holds_floor:
             self.holds_floor = False
             admission.FLOOR.release(self.session_id)
+        if self.holds_api_slot:
+            self.holds_api_slot = False
+            infra.release_api_session()
         if self.ready_at and not self.usage_recorded and self.user_id and self.user_id != "local-dev-owner":
             self.usage_recorded = True
             try:

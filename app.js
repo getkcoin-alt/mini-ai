@@ -8,6 +8,7 @@ import {
   mindConsents, setMindConsent, mindFacts, keepMindFact, rejectMindFact, forgetMindFact, tellMind, mindSyncScore
 } from './mini-supabase.js';
 import { MiniRealtimeSession } from './mini-realtime-client.js';
+import { initSuperAdmin } from './mini-admin.js';
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
@@ -286,6 +287,7 @@ function enterMain() {
   $('#greet-time').textContent = greetingWord();
   $('#greet-name').textContent = 'Hi, ' + (p.display_name || 'friend');
   $('#set-email').textContent = state.user?.email || '';
+  initSuperAdmin($('#super-admin'), async () => (await miniIdentity().auth.getSession()).data?.session?.access_token);
   fillYouForm();
   applyCaptions();
   setTalkState('idle');
