@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import sample from '../api/voice/sample.js';
+import { existsSync, readFileSync } from 'node:fs';
 import { makeSession, COOKIE_NAME } from '../api/_shared/auth.js';
 
 function fakeRes() {
@@ -9,28 +8,8 @@ function fakeRes() {
     status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
 }
 
-test('voice sample upload and delete are refused without calling the worker', async () => {
-  const savedSecret = process.env.MINI_SESSION_SECRET;
-  const savedOwner = process.env.MINI_OWNER_EMAIL;
-  process.env.MINI_SESSION_SECRET = 'a'.repeat(64);
-  process.env.MINI_OWNER_EMAIL = 'owner@example.com';
-  const cookie = COOKIE_NAME + '=' + makeSession({ sub: 'owner', email: 'owner@example.com' });
-  let called = false;
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = async () => { called = true; throw new Error('must not call worker'); };
-  try {
-    for (const method of ['POST', 'DELETE']) {
-      const res = fakeRes();
-      await sample({ method, headers: { origin: 'https://mini.example', host: 'mini.example', cookie }, body: { audio_base64: 'x'.repeat(2000), consent: true }, query: {} }, res);
-      assert.equal(res.code, 403);
-      assert.match(res.body.error, /one fixed voice/);
-    }
-  } finally {
-    globalThis.fetch = realFetch;
-    if (savedSecret === undefined) delete process.env.MINI_SESSION_SECRET; else process.env.MINI_SESSION_SECRET = savedSecret;
-    if (savedOwner === undefined) delete process.env.MINI_OWNER_EMAIL; else process.env.MINI_OWNER_EMAIL = savedOwner;
-  }
-  assert.equal(called, false);
+test('there is no web endpoint to upload or remove voice samples (Mini has one fixed voice)', () => {
+  assert.equal(existsSync(new URL('../api/voice/sample.js', import.meta.url)), false);
 });
 
 test('frontend has no browser speech voice and no voice upload controls', () => {
