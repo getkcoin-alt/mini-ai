@@ -91,7 +91,7 @@ export async function signOutMini() {
 
 function validateProfile(input) {
   const valid = {
-    name: 80, miniName: 80, relationship: 20, tone: 20, focus: 600, boundaries: 600
+    name: 80, miniName: 80, relationship: 20, tone: 20, focus: 600, boundaries: 600, birthYear: 4
   };
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Invalid profile.');
   const out = {};
@@ -108,11 +108,15 @@ export function profileRowForUser(userId, profile, now = new Date().toISOString(
   const data = validateProfile(profile);
   if (!['friend', 'mentor', 'both', undefined].includes(data.relationship)) throw new Error('Invalid companion mode.');
   if (!['gentle', 'balanced', 'direct', undefined].includes(data.tone)) throw new Error('Invalid tone.');
+  if (data.birthYear !== undefined && data.birthYear !== '' && !/^(19[2-9]\d|20[0-3]\d)$/.test(data.birthYear))
+    throw new Error('Invalid birth year.');
   return { user_id: userId, display_name: data.name || '',
     mini_name: data.miniName || 'Mini', companion_mode: data.relationship || 'both',
     tone: data.tone || 'balanced', focus: data.focus || '',
     boundaries: data.boundaries || '',
-    completed_keys: Object.keys(data).filter(key => data[key].length > 0),
+    ...(data.birthYear ? { birth_year: Number(data.birthYear) } : {}),
+    ...(data.birthYear && new Date(now).getUTCFullYear() - Number(data.birthYear) >= 18 ? { age_confirmed_at: now } : {}),
+    completed_keys: Object.keys(data).filter(key => key !== 'birthYear' && data[key].length > 0),
     consented_at: now, updated_at: now };
 }
 
@@ -121,7 +125,7 @@ export async function readMiniProfile() {
   const user = await currentMiniUser();
   if (!user) throw new Error('Sign in first.');
   const { data, error } = await client.from('mini_profiles').select(
-    'display_name,mini_name,companion_mode,tone,focus,boundaries,completed_keys,updated_at'
+    'display_name,mini_name,companion_mode,tone,focus,boundaries,completed_keys,birth_year,updated_at'
   ).eq('user_id', user.id).maybeSingle();
   if (error) throw error;
   return data || null;
@@ -178,4 +182,12 @@ export async function forgetMiniFact(id) {
   if (!/^[a-f\d-]{36}$/i.test(id)) throw new Error('Invalid memory ID.');
   const { error } = await client.from('mini_memories').delete().eq('id', id).eq('user_id', user.id);
   if (error) throw error;
+}
+
+/** Permanently delete the signed-in account and everything Mini stored about it. */
+export async function deleteMiniAccount() {
+  if (!client) throw new Error('Authentication unavailable.');
+  const { error } = await client.rpc('mini_delete_my_account');
+  if (error) throw error;
+  await client.auth.signOut({ scope: 'local' });
 }
