@@ -11,6 +11,8 @@ const realFetch = globalThis.fetch;
 test.after(() => { globalThis.fetch = realFetch; for (const k of KEYS) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; } });
 
 function env(on = true) {
+  // Start from a clean slate: CI/Vercel builds expose real production env vars.
+  for (const k of ['MINI_REALTIME_AUDIENCE', 'MINI_REALTIME_ALLOWED_EMAILS', 'MINI_REQUIRE_AGE_CONFIRMATION']) delete process.env[k];
   Object.assign(process.env, { MINI_WORKER_TOKEN: 'w'.repeat(48), MINI_OWNER_EMAIL: 'owner@example.com',
     MINI_SUPABASE_URL: 'https://abcdefgh.supabase.co', MINI_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_x',
     MINI_REALTIME_ENABLED: String(on), MINI_REALTIME_GATEWAY_READY: String(on),
