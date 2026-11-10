@@ -52,6 +52,7 @@ p { margin: 0 0 .75rem; line-height: 1.55; }
 .app[data-screen="email"] #s-email,
 .app[data-screen="onboard"] #s-onboard,
 .app[data-screen="kids"] #s-kids,
+.app[data-screen="meet"] #s-meet,
 .app[data-screen="main"] #s-main { display: flex; }
 
 .page-pad { padding: 20px 20px calc(var(--tabbar-h) + var(--safe-bottom) + 24px); }
@@ -238,3 +239,19 @@ input:focus, textarea:focus, select:focus { border-color: var(--purple); }
 .keep-actions { display: flex; gap: 8px; margin-top: 10px; }
 .keep-actions .btn { min-height: 40px; padding: 0 16px; font-size: .9rem; }
 .mem-item.pending { flex-direction: column; }
+
+/* Onboarding cheer + Meet Mini */
+.cheer { align-self: flex-start; max-width: 92%; margin: 0 0 6px; padding: 10px 14px; border-radius: 18px 18px 18px 6px;
+  background: rgba(181, 160, 255, .14); border: 1px solid rgba(181, 160, 255, .3); color: #ece8ff; font-size: .95rem;
+  animation: pop .35s ease-out; }
+@keyframes pop { from { opacity: 0; transform: translateY(6px) scale(.97); } to { opacity: 1; transform: none; } }
+.meet { padding-bottom: calc(28px + var(--safe-bottom)); text-align: center; }
+.meet-title { font-size: 2rem; margin-bottom: 10px; }
+.meet-lines p { color: #d8d6ea; font-size: 1.02rem; }
+.meet-promise { list-style: none; padding: 0; margin: 18px 0; display: grid; gap: 10px; text-align: left; }
+.meet-promise li { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 18px; background: var(--card); border: 1px solid var(--line); }
+.meet-promise strong { display: block; }
+.meet-promise small { color: var(--muted); }
+.meet-icon { font-size: 1.4rem; }
+.meet-consents { display: grid; gap: 12px; margin: 14px 0 18px; }
+.meet-go { width: 100%; min-height: 58px; font-size: 1.08rem; }

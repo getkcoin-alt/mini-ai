@@ -90,7 +90,8 @@ def render_prompt(pkg: dict | None) -> str:
             lines.append("Encourage them like this: " + persona["motivation_style"])
         if persona.get("story_style"):
             lines.append("If a story would lift them, tell a tiny one: " + persona["story_style"])
-    facts = pkg.get("facts") or []
+    # "Role Mini should play" came from the old friend/mentor switch; Mini is one entity now.
+    facts = [f for f in (pkg.get("facts") or []) if f.get("what") not in ("Role Mini should play",)]
     if facts:
         lines.append("What they have told you (confirmed): " + "; ".join(
             f"{f.get('what')}: {f.get('value')}" for f in facts[:12]))

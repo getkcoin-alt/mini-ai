@@ -82,3 +82,10 @@ class CrisisFollowupTests(unittest.TestCase):
         self.assertIsNone(engine.crisis_followup("I want to hurt myself", "Please call 14416 now."))
         for text in ["this traffic is killing me", "I could die laughing", "what should I cook", "my phone died"]:
             self.assertIsNone(engine.crisis_followup(text, "ok"), text)
+
+
+class OneMiniTests(unittest.TestCase):
+    def test_mini_is_one_entity_whatever_mode_old_clients_send(self):
+        from services.voice_worker import engine
+        self.assertEqual(engine.PROMPTS["friend"], engine.PROMPTS["mentor"])
+        self.assertIn("one warm AI companion", engine.PROMPTS["friend"])

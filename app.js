@@ -109,29 +109,54 @@ async function onUser(user) {
 }
 
 /* ---------- onboarding ---------- */
+// Mini is ONE companion (no friend/mentor choice). Six warm questions, a cheer
+// after every answer, then "Meet Mini": what Mini is for this person.
+const firstName = (d) => (d.name || '').trim().split(/\s+/)[0] || 'friend';
 const STEPS = [
   { key: 'name', q: 'What should I call you?', help: 'First name, nickname — whatever feels like you.', kind: 'text',
     placeholder: 'Your name', required: true, max: 80 },
-  { key: 'birthYear', q: 'What year were you born?', help: 'So I can talk with you in the right way for your age.',
-    kind: 'year', required: true },
-  { key: 'relationship', q: 'What would you like me to be?', kind: 'choice', options: [
-    ['friend', 'A best friend', 'Fun, warm, always up for a chat'],
-    ['mentor', 'A mentor', 'Calm, practical, helps you grow'],
-    ['both', 'A bit of both', 'Whatever you need that day']] },
+  { key: 'birthYear', q: 'What year were you born?', help: 'So I can be the right kind of company for where you are in life.',
+    kind: 'year', required: true,
+    cheer: (d) => `Lovely to meet you, ${firstName(d)}! I already like you. 🙂` },
   { key: 'tone', q: 'How should I talk with you?', kind: 'choice', options: [
     ['gentle', 'Gently', 'Soft and encouraging'],
-    ['balanced', 'Balanced', 'Friendly and honest'],
-    ['direct', 'Straight up', 'Short and to the point']] },
-  { key: 'focus', q: "What's on your mind these days?", help: 'Work, studies, family, a goal — anything. You can skip this.',
-    kind: 'area', placeholder: 'e.g. Preparing for exams, missing home…', max: 600 },
-  { key: 'boundaries', q: 'Anything I should avoid talking about?', help: "Totally optional. I'll respect it.",
-    kind: 'area', placeholder: "e.g. Please don't bring up my ex", max: 600, last: true },
+    ['balanced', 'Like a good friend', 'Warm and honest'],
+    ['direct', 'Straight up', 'Short and to the point']],
+    cheer: (d) => { const a = ageOf(d.birthYear); return a ? `${stageFor(a).hello} Three more and I'm all yours.` : 'Great, almost there!'; } },
+  { key: 'loves', q: 'What do you love doing?', help: 'Hobbies, music, games, cooking, cricket… anything that makes you smile.',
+    kind: 'area', placeholder: 'e.g. Cricket on Sundays, old Bollywood songs, long drives', max: 300,
+    cheer: (d) => d.tone === 'direct' ? 'Got it — short and real. I like that.' : d.tone === 'gentle' ? "I'll always be gentle with you. Promise." : "Perfect — I'll talk with you like a good friend." },
+  { key: 'focus', q: "What's on your mind these days?", help: 'Work, studies, family, a goal — big or small. You can skip this.',
+    kind: 'area', placeholder: 'e.g. Launching my startup, missing home…', max: 600,
+    cheer: (d) => d.loves ? `Ooh, ${shortOf(d.loves)} — you have to tell me more about that!` : "No worries, you'll tell me when it comes up." },
+  { key: 'boundaries', q: 'Anything I should never bring up?', help: "Totally optional. I'll always respect it.",
+    kind: 'area', placeholder: "e.g. Please don't talk about my ex", max: 600, last: true,
+    cheer: (d) => d.focus ? `Thank you for trusting me with that. I'll be right there with you on ${shortOf(d.focus)}.` : 'Last one, I promise!' },
 ];
+
+// Life stages from docs/HUMAN-INTELLIGENCE-DATABASE.md (adults; kids come later with a parent's OK).
+const STAGES = [
+  [24, 'discovering who you are and where you want to go', "Big years ahead — I'm so here for the adventure!"],
+  [34, 'building the foundations of your life', 'Building years! I love a person with plans.'],
+  [49, 'carrying a lot and growing even more', "You carry a lot — I'll make sure someone's checking on you too."],
+  [64, 'shaping your next chapter and passing on what you know', 'Your stories are going to be my favourite part.'],
+  [79, 'enjoying life and the people who matter', "I can't wait to hear about your days and your memories."],
+  [200, 'living with dignity, comfort and the people you love', "I'm honoured. Let's take it slow and enjoy every chat."],
+];
+function ageOf(year) { const y = Number(year); return y ? new Date().getFullYear() - y : null; }
+function stageFor(age) { const s = STAGES.find(([max]) => age <= max) || STAGES[STAGES.length - 1]; return { theme: s[1], hello: s[2] }; }
+function shortOf(text) {
+  // Echo the person's words back in Mini's voice: "my startup" -> "your startup", keep their capitals.
+  const swap = { my: 'your', me: 'you', i: 'you', "i'm": "you're", im: "you're", mine: 'yours', myself: 'yourself', "i've": "you've" };
+  let t = String(text || '').split(/[,.;!\n]/)[0].trim().replace(/\b(my|me|i'm|im|i've|i|mine|myself)\b/gi, (w) => swap[w.toLowerCase()] || w);
+  if (t.length > 40) t = t.slice(0, 40) + '…';
+  return t && /^[A-Z][a-z]/.test(t) && !/^I\b/.test(t) ? t[0].toLowerCase() + t.slice(1) : t;
+}
 
 function startOnboarding(profile) {
   state.draft = {
     name: profile?.display_name || '', birthYear: profile?.birth_year ? String(profile.birth_year) : '',
-    relationship: profile?.companion_mode || 'friend', tone: profile?.tone || 'balanced',
+    tone: profile?.tone || 'balanced', loves: '',
     focus: profile?.focus || '', boundaries: profile?.boundaries || '', miniName: profile?.mini_name || 'Mini',
   };
   state.step = 0;
@@ -143,10 +168,13 @@ function renderStep() {
   const step = STEPS[state.step];
   $('#ob-count').textContent = String(state.step + 1).padStart(2, '0') + ' / ' + String(STEPS.length).padStart(2, '0');
   $('#ob-bar').style.width = ((state.step + 1) / STEPS.length * 100) + '%';
+  const cheer = step.cheer ? step.cheer(state.draft) : '';
+  $('#ob-cheer').textContent = cheer;
+  $('#ob-cheer').classList.toggle('hidden', !cheer);
   $('#ob-question').textContent = step.q;
   $('#ob-help').textContent = step.help || '';
   $('#ob-skip').classList.toggle('hidden', Boolean(step.required));
-  $('#ob-next').textContent = step.last ? "Let's talk" : 'Next';
+  $('#ob-next').textContent = step.last ? 'Meet Mini ✨' : 'Next';
   const box = $('#ob-input');
   box.replaceChildren();
   const value = state.draft[step.key] || '';
@@ -164,7 +192,7 @@ function renderStep() {
     setTimeout(() => input.focus(), 60);
   } else if (step.kind === 'area') {
     const area = document.createElement('textarea');
-    Object.assign(area, { id: 'ob-field', rows: 4, maxLength: step.max, placeholder: step.placeholder, value });
+    Object.assign(area, { id: 'ob-field', rows: 3, maxLength: step.max, placeholder: step.placeholder, value });
     box.append(area);
   } else if (step.kind === 'choice') {
     for (const [val, title, sub] of step.options) {
@@ -179,17 +207,6 @@ function renderStep() {
         $$('#ob-input .choice').forEach((c) => c.setAttribute('aria-pressed', String(c === b)));
       });
       box.append(b);
-    }
-  }
-  if (step.last) {
-    for (const [id, html] of [
-      ['ob-consent', 'Remember my answers so Mini can get to know me. I can change or delete them anytime.'],
-      ['ob-learn', 'Let Mini learn from our conversations — your day, people and goals — so it truly gets to know you. You review everything in Memories.'],
-      ['ob-terms', 'I agree to the <a href="/terms.html" target="_blank">Terms</a> and <a href="/privacy.html" target="_blank">Privacy Policy</a>.']]) {
-      const label = document.createElement('label'); label.className = 'consent';
-      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.id = id;
-      const span = document.createElement('span'); span.innerHTML = html; // static, trusted text
-      label.append(cb, span); box.append(label);
     }
   }
 }
@@ -212,20 +229,51 @@ async function nextStep(skip = false) {
     if (now - year < ADULT_AGE) return show('kids'); // nothing is saved for under-18s yet
   }
   if (!step.last) { state.step++; renderStep(); return; }
+  showMeetMini();
+}
+
+/* "Meet Mini": after all answers, Mini tells the person what it is for them. */
+function showMeetMini() {
+  const d = state.draft, age = ageOf(d.birthYear), stage = stageFor(age || 30);
+  $('#meet-title').textContent = `Hi ${firstName(d)}, I'm Mini.`;
+  const lines = [
+    "I'm not a bot you use — I'm one companion who's chosen you. I'll listen, remember your days, cheer your wins and stay with you on the hard ones.",
+    `You're ${stage.theme}, and I want to be part of that journey.`,
+  ];
+  if (d.loves) lines.push(`I already know you love ${shortOf(d.loves)} — so expect me to ask about it!`);
+  if (d.focus) lines.push(`And ${shortOf(d.focus)}? Let's figure it out together, one talk at a time.`);
+  if (d.boundaries) lines.push("I'll never bring up what you asked me not to.");
+  $('#meet-lines').replaceChildren(...lines.map((t) => { const p = document.createElement('p'); p.textContent = t; return p; }));
+  $('#meet-promise').replaceChildren(...[
+    ['🎧', 'I listen first', 'Talk like you would to a friend. Interrupt me anytime.'],
+    ['🧠', 'I remember', 'Your day, your people, your goals — you can see and delete it all.'],
+    ['🌱', 'We grow together', 'Every talk, I know you a little better. Watch your sync % rise.'],
+  ].map(([icon, title, sub]) => {
+    const li = document.createElement('li');
+    const i = document.createElement('span'); i.className = 'meet-icon'; i.textContent = icon; i.setAttribute('aria-hidden', 'true');
+    const t = document.createElement('div'); const st = document.createElement('strong'); st.textContent = title;
+    const sm = document.createElement('small'); sm.textContent = sub; t.append(st, sm);
+    li.append(i, t); return li;
+  }));
+  show('meet');
+}
+
+async function finishOnboarding() {
   if (!$('#ob-consent').checked || !$('#ob-terms').checked)
-    return toast('Please tick both boxes so Mini can remember you.');
-  const btn = $('#ob-next'); btn.disabled = true;
+    return toast('Please tick the first and last boxes so Mini can remember you.');
+  const btn = $('#meet-go'); btn.disabled = true;
   try {
     const d = state.draft;
-    await saveMiniProfile({ name: d.name, miniName: d.miniName || 'Mini', relationship: d.relationship || 'friend',
+    await saveMiniProfile({ name: d.name, miniName: d.miniName || 'Mini', relationship: 'both',
       tone: d.tone || 'balanced', focus: d.focus || '', boundaries: d.boundaries || '', birthYear: d.birthYear }, true);
     state.profile = await readMiniProfile();
     if ($('#ob-learn').checked) {
       try { await setMindConsent('learn_from_conversations', true); await setMindConsent('proactive_followups', true); }
       catch (error) { toast('Could not save the learning choice: ' + friendlyError(error)); }
     }
+    if (d.loves) { try { await tellMind({ kind: 'preference', text: d.loves.slice(0, 300) }); } catch { /* optional */ } }
     enterMain();
-    setTimeout(() => toast("You're all set! Tap Mini whenever you want to talk."), 400);
+    setTimeout(() => toast(`Welcome home, ${firstName(d)}! Tap me whenever you want to talk. 💜`), 400);
   } catch (error) {
     toast('Could not save: ' + friendlyError(error));
   } finally { btn.disabled = false; }
@@ -234,11 +282,10 @@ async function nextStep(skip = false) {
 /* ---------- main app ---------- */
 function enterMain() {
   const p = state.profile || {};
-  state.mode = p.companion_mode === 'mentor' ? 'mentor' : 'friend';
+  state.mode = 'friend';   // Mini is one entity; the mind shapes how it talks
   $('#greet-time').textContent = greetingWord();
   $('#greet-name').textContent = 'Hi, ' + (p.display_name || 'friend');
   $('#set-email').textContent = state.user?.email || '';
-  updateModeChip();
   fillYouForm();
   applyCaptions();
   setTalkState('idle');
@@ -271,9 +318,6 @@ function setTab(name) {
   window.scrollTo(0, 0);
 }
 
-function updateModeChip() {
-  $('#mode-chip').textContent = state.mode === 'mentor' ? '✦ Mentor' : '♡ Friend';
-}
 
 /* ---------- talk ---------- */
 const TALK_TEXT = {
@@ -447,7 +491,7 @@ function fillYouForm() {
   $('#you-mini').value = p.mini_name || 'Mini';
   $('#you-focus').value = p.focus || '';
   $('#you-bound').value = p.boundaries || '';
-  for (const [name, val] of [['rel', p.companion_mode || 'friend'], ['tone', p.tone || 'balanced']]) {
+  for (const [name, val] of [['tone', p.tone || 'balanced']]) {
     const el = document.querySelector(`input[name="${name}"][value="${val}"]`);
     if (el) el.checked = true;
   }
@@ -501,6 +545,8 @@ function bindStatic() {
 
   $('#ob-next').addEventListener('click', () => void nextStep(false));
   $('#ob-skip').addEventListener('click', () => void nextStep(true));
+  $('#meet-go').addEventListener('click', () => void finishOnboarding());
+  $('#meet-back').addEventListener('click', () => { show('onboard'); renderStep(); });
   $('#ob-back').addEventListener('click', () => {
     readStepValue();
     if (state.step === 0) return void signOutMini().catch(() => {});
@@ -509,13 +555,6 @@ function bindStatic() {
   $('#kids-signout').addEventListener('click', () => void signOutMini().catch(() => {}));
 
   $$('.tab').forEach((t) => t.addEventListener('click', () => setTab(t.dataset.tab)));
-  $('#mode-chip').addEventListener('click', () => {
-    if (state.session) return toast('End this conversation to switch.');
-    state.mode = state.mode === 'mentor' ? 'friend' : 'mentor';
-    updateModeChip();
-    toast(state.mode === 'mentor' ? 'Mentor mode: calm and practical' : 'Friend mode: warm and playful');
-  });
-
   $('#talk-btn').addEventListener('click', () => { if (state.session) stopTalking(); else void startTalking(); });
   $('#orb').addEventListener('click', () => {
     if (!state.session) return void startTalking();
@@ -541,7 +580,7 @@ function bindStatic() {
     try {
       await saveMiniProfile({
         name: $('#you-name').value.trim(), miniName: $('#you-mini').value.trim() || 'Mini',
-        relationship: pick('rel') || 'friend', tone: pick('tone') || 'balanced',
+        relationship: 'both', tone: pick('tone') || 'balanced',
         focus: $('#you-focus').value.trim(), boundaries: $('#you-bound').value.trim(),
         birthYear: p.birth_year ? String(p.birth_year) : undefined,
       }, true);
