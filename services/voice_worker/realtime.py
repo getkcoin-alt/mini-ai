@@ -563,7 +563,7 @@ class MiniRealtimeSession:
         transcript = None
         if self.plan["stt"] == "api":
             try:
-                transcript = await cloud.transcribe(audio_samples)
+                transcript = await cloud.transcribe(audio_samples, self.plan.get("stt_model") or infra.STT_MODEL_DEFAULT)
             except cloud.ProviderError as exc:
                 infra.record("fallback", "stt", "groq", str(exc))
                 self.plan["stt"] = "local"  # stay local for the rest of this conversation

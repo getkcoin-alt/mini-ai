@@ -44,12 +44,11 @@ def _wav16k(samples: np.ndarray) -> bytes:
     return buf.getvalue()
 
 
-async def transcribe(samples: np.ndarray) -> str:
+async def transcribe(samples: np.ndarray, model: str = infra.STT_MODEL_DEFAULT) -> str:
     """16 kHz float32 speech -> text via Groq Whisper."""
-    key = os.environ.get(infra.STT_KEY, "")
+    key = infra.secret(infra.STT_KEY)
     if not infra.has(infra.STT_KEY):
         raise ProviderError("stt key missing")
-    model = os.environ.get("MINI_GROQ_STT_MODEL", infra.STT_MODEL_DEFAULT)
     try:
         async with httpx.AsyncClient(timeout=_timeout(10), trust_env=False) as client:
             resp = await client.post(
@@ -88,7 +87,7 @@ async def chat_stream(provider: str, model: str, messages: list[dict], *, max_to
     spec = infra.LLM_PROVIDERS.get(provider)
     if not spec or not infra.has(spec["key"]):
         raise ProviderError(f"{provider} key missing")
-    headers = {"Authorization": f"Bearer {os.environ[spec['key']].strip()}", "Content-Type": "application/json"}
+    headers = {"Authorization": f"Bearer {infra.secret(spec['key'])}", "Content-Type": "application/json"}
     if provider == "openrouter":
         headers["X-Title"] = "Mini"
     body = {"model": model, "messages": messages, "stream": True, "max_tokens": max_tokens,
@@ -174,15 +173,15 @@ async def speak_stream(text: str) -> AsyncIterator[np.ndarray]:
     if not all(infra.has(k) for k in infra.TTS_KEYS):
         raise ProviderError("tts key missing")
     url = os.environ.get("MINI_RESEMBLE_STREAM_URL", "https://f.cluster.resemble.ai/stream")
-    body = {"voice_uuid": os.environ["MINI_RESEMBLE_VOICE_UUID"].strip(), "data": text[:600],
+    body = {"voice_uuid": infra.secret("MINI_RESEMBLE_VOICE_UUID"), "data": text[:600],
             "precision": "PCM_16", "sample_rate": RESEMBLE_RATE}
-    if os.environ.get("MINI_RESEMBLE_PROJECT_UUID"):
-        body["project_uuid"] = os.environ["MINI_RESEMBLE_PROJECT_UUID"].strip()
+    if infra.secret("MINI_RESEMBLE_PROJECT_UUID"):
+        body["project_uuid"] = infra.secret("MINI_RESEMBLE_PROJECT_UUID")
     decoder = WavStreamDecoder()
     try:
         async with httpx.AsyncClient(timeout=_timeout(20), trust_env=False) as client:
             async with client.stream("POST", url, json=body, headers={
-                    "Authorization": f"Bearer {os.environ['MINI_RESEMBLE_API_KEY'].strip()}",
+                    "Authorization": f"Bearer {infra.secret('MINI_RESEMBLE_API_KEY')}",
                     "Content-Type": "application/json"}) as resp:
                 if resp.status_code != 200:
                     raise ProviderError(f"tts http {resp.status_code}")
@@ -192,3 +191,49 @@ async def speak_stream(text: str) -> AsyncIterator[np.ndarray]:
                         yield out
     except httpx.HTTPError as exc:
         raise ProviderError(f"tts {type(exc).__name__}") from None
+
+
+RESEMBLE_API = "https://app.resemble.ai/api/v2"
+
+
+async def list_models(provider: str) -> list[dict]:
+    """Model ids the key can use (doubles as a key check). provider: groq|gemini|openrouter|resemble."""
+    if provider == "resemble":
+        if not infra.has("MINI_RESEMBLE_API_KEY"):
+            raise ProviderError("resemble key missing")
+        url, headers = RESEMBLE_API + "/voices", {"Authorization": f"Bearer {infra.secret('MINI_RESEMBLE_API_KEY')}"}
+        params = {"page": 1, "page_size": 100}
+    else:
+        spec = infra.LLM_PROVIDERS.get(provider)
+        if not spec:
+            raise ProviderError("unknown provider")
+        if not infra.has(spec["key"]):
+            raise ProviderError(f"{provider} key missing")
+        url, headers, params = spec["base"] + "/models", {"Authorization": f"Bearer {infra.secret(spec['key'])}"}, None
+    try:
+        async with httpx.AsyncClient(timeout=_timeout(10), trust_env=False) as client:
+            resp = await client.get(url, headers=headers, params=params)
+    except httpx.HTTPError as exc:
+        raise ProviderError(f"{provider} {type(exc).__name__}") from None
+    if resp.status_code != 200:
+        raise ProviderError(f"{provider} http {resp.status_code}")
+    return parse_model_list(provider, resp.json())
+
+
+def parse_model_list(provider: str, payload) -> list[dict]:
+    items = []
+    rows = (payload or {}).get("items") if provider == "resemble" else (payload or {}).get("data")
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+        if provider == "resemble":
+            if row.get("uuid"):
+                items.append({"id": str(row["uuid"]), "name": str(row.get("name") or row["uuid"])[:80]})
+            continue
+        mid = str(row.get("id") or "")
+        if provider == "gemini" and mid.startswith("models/"):
+            mid = mid[len("models/"):]
+        if mid:
+            items.append({"id": mid[:120], "name": str(row.get("name") or mid)[:120],
+                          "kind": "speech" if "whisper" in mid.lower() else "chat"})
+    return sorted(items, key=lambda r: r["id"])[:400]

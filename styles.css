@@ -263,3 +263,9 @@ input:focus, textarea:focus, select:focus { border-color: var(--purple); }
 .adm-user { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; }
 .adm-events { margin: 0; padding-left: 18px; color: var(--muted); font-size: .78rem; display: grid; gap: 4px; overflow-wrap: anywhere; }
 .admin-card[hidden] { display: none; }
+.adm-keys { display: grid; gap: 12px; }
+.adm-key { display: grid; grid-template-columns: 1fr auto; gap: 6px 8px; align-items: center; }
+.adm-key > span { grid-column: 1 / -1; }
+.adm-key > span small { display: block; color: var(--muted); font-size: .78rem; overflow-wrap: anywhere; }
+.adm-key .btn-text { grid-column: 1 / -1; justify-self: start; min-height: 32px; padding: 0; }
+.adm-actions { display: flex; flex-wrap: wrap; gap: 8px; }

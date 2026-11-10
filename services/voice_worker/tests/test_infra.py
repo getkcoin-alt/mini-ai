@@ -51,9 +51,38 @@ class InfraSettingsTests(unittest.TestCase):
 
     def test_status_never_contains_key_values(self):
         text = repr(infra.status())
-        for value in KEYS.values():
-            if value:
+        for name, value in KEYS.items():
+            if value and infra.SECRET_NAMES[name]["secret"]:
                 self.assertNotIn(value, text)
+
+    def test_admin_keys_override_env_and_are_never_echoed(self):
+        infra.set_secret("MINI_GEMINI_API_KEY", "AIza_admin_value_9876", by="boss@example.com")
+        self.assertEqual(infra.secret("MINI_GEMINI_API_KEY"), "AIza_admin_value_9876")
+        infra.set_secret("MINI_GROQ_API_KEY", "gsk_admin_value_5555")
+        self.assertEqual(infra.secret("MINI_GROQ_API_KEY"), "gsk_admin_value_5555")  # beats env
+        keys_file = Path(os.environ["MINI_INFRA_FILE"]).with_name("infra-keys.json")
+        self.assertEqual(oct(keys_file.stat().st_mode & 0o777), "0o600")
+        summary = infra.key_summary()
+        self.assertEqual(summary["MINI_GEMINI_API_KEY"], {"label": "Gemini API key", "set": True,
+                                                          "source": "admin", "hint": "…9876"})
+        self.assertEqual(summary["MINI_RESEMBLE_VOICE_UUID"]["hint"], "voice-uuid-0000")  # ids are not secret
+        text = repr(infra.status())
+        self.assertNotIn("admin_value", text)
+        self.assertIn("…9876", text)
+        infra.remove_secret("MINI_GROQ_API_KEY")
+        self.assertEqual(infra.secret("MINI_GROQ_API_KEY"), KEYS["MINI_GROQ_API_KEY"])  # back to env
+        self.assertEqual(infra.key_summary()["MINI_GROQ_API_KEY"]["source"], "server")
+
+    def test_bad_keys_refused(self):
+        for name, value in (("MINI_SOMETHING_ELSE", "abcdefgh12"), ("MINI_GROQ_API_KEY", "short"),
+                            ("MINI_GROQ_API_KEY", "has spaces in it 1234"), ("MINI_GROQ_API_KEY", "a\nb" * 5)):
+            with self.assertRaises(infra.SettingsError):
+                infra.set_secret(name, value)
+
+    def test_stt_model_setting(self):
+        infra.save({"default": {"mode": "api", "llm_provider": "groq", "llm_model": "", "stt_model": "whisper-large-v3"},
+                    "users": {}})
+        self.assertEqual(infra.resolve("a@b.co")["stt_model"], "whisper-large-v3")
 
     def test_api_session_limit(self):
         with patch.dict(os.environ, {"MINI_API_MAX_SESSIONS": "1"}):
@@ -73,6 +102,14 @@ except ImportError:  # pragma: no cover - CI sanity job has no numpy/httpx
 
 @unittest.skipIf(cloud is None, "voice stack not installed")
 class CloudParsingTests(unittest.TestCase):
+    def test_model_lists(self):
+        groq = cloud.parse_model_list("groq", {"data": [{"id": "llama-3.3-70b-versatile"}, {"id": "whisper-large-v3-turbo"}]})
+        self.assertEqual([m["kind"] for m in groq], ["chat", "speech"])
+        gem = cloud.parse_model_list("gemini", {"data": [{"id": "models/gemini-2.5-flash"}]})
+        self.assertEqual(gem[0]["id"], "gemini-2.5-flash")
+        voices = cloud.parse_model_list("resemble", {"items": [{"uuid": "abc123", "name": "Mini"}, {"name": "no id"}]})
+        self.assertEqual(voices, [{"id": "abc123", "name": "Mini"}])
+
     def test_sse_lines(self):
         self.assertEqual(cloud.parse_sse_line('data: {"choices":[{"delta":{"content":"Hi"}}]}'), ("Hi", False))
         self.assertEqual(cloud.parse_sse_line("data: [DONE]"), ("", True))

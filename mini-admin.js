@@ -35,21 +35,74 @@ export function summarizePlan(choice, readiness) {
     : 'API mode: Groq hearing, ' + PROVIDERS[choice.llm_provider] + ' thinking, hosted Mini voice.';
 }
 
-function render(root, data, save) {
+function keyRow(name, info, api, setMsg) {
+  const secret = !/UUID$/.test(name);
+  const input = el('input', { type: secret ? 'password' : 'text', autocomplete: 'off', spellcheck: 'false',
+    maxlength: '400', placeholder: info.set ? 'Replace…' : (secret ? 'Paste key' : 'Paste id'), 'aria-label': info.label });
+  if (name === 'MINI_RESEMBLE_VOICE_UUID') input.setAttribute('list', 'adm-voices');
+  const state = el('small', {}, info.set
+    ? 'Added ' + (info.hint || '') + (info.source === 'server' ? ' · from server file' : ' · added here')
+    : 'Not added');
+  const saveBtn = el('button', { type: 'button', class: 'btn btn-ghost', onclick: async () => {
+    if (!input.value.trim()) return;
+    saveBtn.disabled = true;
+    try { await api.post({ action: 'set_key', name, value: input.value.trim() }); input.value = ''; setMsg(info.label + ' saved.'); await api.refresh(); }
+    catch (err) { setMsg(err.message); }
+    saveBtn.disabled = false;
+  } }, 'Save');
+  const row = el('div', { class: 'adm-key' }, el('span', {}, el('strong', {}, info.label), state), input, saveBtn);
+  if (info.source === 'admin') {
+    row.append(el('button', { type: 'button', class: 'btn-text', 'aria-label': 'Remove ' + info.label, onclick: async () => {
+      if (!confirm('Remove ' + info.label + '? Mini falls back to the server file or the local models.')) return;
+      try { await api.post({ action: 'remove_key', name }); setMsg(info.label + ' removed.'); await api.refresh(); }
+      catch (err) { setMsg(err.message); }
+    } }, 'Remove'));
+  }
+  return row;
+}
+
+function fillList(list, models) {
+  list.replaceChildren(...models.map((m) => el('option', { value: m.id }, m.name && m.name !== m.id ? m.name : '')));
+}
+
+function render(root, data, api) {
   const s = data.settings;
   const r = data.readiness;
   root.replaceChildren();
+  const msg = el('p', { class: 'fine', role: 'status' });
+  const setMsg = (text) => { msg.textContent = text; };
+
   const mode = el('select', { id: 'adm-mode', 'aria-label': 'Default infrastructure' },
     option('local', 'Our server (local models)', s.default.mode === 'local'),
     option('api', 'API models (no GPU needed)', s.default.mode === 'api'));
   const provider = el('select', { id: 'adm-provider', 'aria-label': 'LLM provider' },
     ...Object.entries(PROVIDERS).map(([k, label]) =>
       option(k, label + ' (' + readyText(r.llm?.[k]) + ')', s.default.llm_provider === k)));
-  const model = el('input', { id: 'adm-model', type: 'text', maxlength: '100', autocomplete: 'off',
+  const chatList = el('datalist', { id: 'adm-chat-models' });
+  const sttList = el('datalist', { id: 'adm-stt-models' });
+  const voiceList = el('datalist', { id: 'adm-voices' });
+  const model = el('input', { id: 'adm-model', type: 'text', maxlength: '100', autocomplete: 'off', list: 'adm-chat-models',
     placeholder: data.providers?.[s.default.llm_provider]?.default_model || 'default model' });
   model.value = s.default.llm_model || '';
+  const stt = el('input', { id: 'adm-stt', type: 'text', maxlength: '100', autocomplete: 'off', list: 'adm-stt-models',
+    placeholder: data.stt_model || 'whisper-large-v3-turbo' });
+  stt.value = s.default.stt_model || '';
+  const modelNote = el('small', { class: 'fine' });
+  const loadModels = async (which) => {
+    modelNote.textContent = 'Loading ' + (PROVIDERS[which] || 'Resemble') + ' models…';
+    try {
+      const out = await api.post({ action: 'models', provider: which });
+      if (!out.ok) { modelNote.textContent = (PROVIDERS[which] || 'Resemble') + ': ' + out.error; return; }
+      if (which === 'resemble') { fillList(voiceList, out.models); modelNote.textContent = out.models.length + ' Resemble voices loaded: pick Mini’s voice in the voice id box.'; return; }
+      fillList(chatList, out.models.filter((m) => m.kind !== 'speech'));
+      if (which === 'groq') fillList(sttList, out.models.filter((m) => m.kind === 'speech'));
+      modelNote.textContent = PROVIDERS[which] + ' key works · ' + out.models.length + ' models. Click the model box to choose.';
+    } catch (err) { modelNote.textContent = err.message; }
+  };
   provider.addEventListener('change', () => {
     model.placeholder = data.providers?.[provider.value]?.default_model || 'default model';
+    chatList.replaceChildren();
+    if (r.llm?.[provider.value]) loadModels(provider.value);
   });
   const plan = el('p', { class: 'fine', id: 'adm-plan' }, summarizePlan(s.default, r));
   const refreshPlan = () => { plan.textContent = summarizePlan({ mode: mode.value, llm_provider: provider.value }, r); };
@@ -68,22 +121,23 @@ function render(root, data, save) {
   };
   for (const [email, choice] of Object.entries(s.users || {})) addUserRow(email, choice);
 
-  const msg = el('p', { class: 'fine', role: 'status' });
   const saveBtn = el('button', { type: 'button', class: 'btn btn-primary', onclick: async () => {
     const overrides = {};
     for (const row of users.querySelectorAll('.adm-user')) {
       const [e, m] = row.querySelectorAll('input, select');
       if (e.value.trim()) overrides[e.value.trim().toLowerCase()] = { mode: m.value };
     }
-    const settings = { default: { mode: mode.value, llm_provider: provider.value, llm_model: model.value.trim() }, users: overrides };
+    const settings = { default: { mode: mode.value, llm_provider: provider.value, llm_model: model.value.trim(),
+      stt_model: stt.value.trim() }, users: overrides };
     saveBtn.disabled = true;
-    msg.textContent = 'Saving…';
-    try {
-      await save(settings);
-      msg.textContent = 'Saved. New conversations use this right away.';
-    } catch (err) { msg.textContent = err.message; }
+    setMsg('Saving…');
+    try { await api.post({ action: 'settings', settings }); setMsg('Saved. New conversations use this right away.'); await api.refresh(); }
+    catch (err) { setMsg(err.message); }
     saveBtn.disabled = false;
   } }, 'Save');
+
+  const keys = el('div', { class: 'adm-keys' },
+    ...Object.entries(data.keys || {}).map(([name, info]) => keyRow(name, info, api, setMsg)));
 
   const events = el('ul', { class: 'adm-events' });
   for (const ev of (data.events || []).slice(0, 8)) {
@@ -94,19 +148,28 @@ function render(root, data, save) {
 
   root.append(
     el('h3', {}, 'Super admin · Where Mini runs'),
-    el('p', { class: 'hint' }, "Same Mini everywhere: same mind, same voice, same safety. Only where the models run changes."),
+    el('p', { class: 'hint' }, 'Same Mini everywhere: same mind, same voice, same safety. Only where the models run changes.'),
     el('label', { class: 'field' }, el('span', {}, 'Default for everyone'), mode),
-    el('label', { class: 'field' }, el('span', {}, 'Thinking model (API mode)'), provider),
-    el('label', { class: 'field' }, el('span', {}, 'Model name (blank = default)'), model),
-    el('p', { class: 'fine' }, 'Hearing: Groq ' + data.stt_model + ' (' + readyText(r.stt) + ') · Voice: hosted Mini voice (' +
-      readyText(r.tts) + ') · API conversations now: ' + data.api_sessions + '/' + data.api_max_sessions),
+    el('label', { class: 'field' }, el('span', {}, 'Thinking provider (API mode)'), provider),
+    el('label', { class: 'field' }, el('span', {}, 'Thinking model (blank = default)'), model, chatList),
+    el('label', { class: 'field' }, el('span', {}, 'Hearing model at Groq (blank = default)'), stt, sttList),
+    el('div', { class: 'adm-actions' },
+      el('button', { type: 'button', class: 'btn btn-ghost', onclick: () => loadModels(provider.value) }, 'Load models'),
+      el('button', { type: 'button', class: 'btn btn-ghost', onclick: () => loadModels('resemble') }, 'Load voices')),
+    modelNote,
+    el('p', { class: 'fine' }, 'Hearing (' + readyText(r.stt) + ') · Voice: hosted Mini voice (' + readyText(r.tts) +
+      ') · API conversations now: ' + data.api_sessions + '/' + data.api_max_sessions),
     plan,
     el('div', { class: 'field' }, el('span', {}, 'Per-user overrides'), users,
       el('button', { type: 'button', class: 'btn btn-ghost', onclick: () => addUserRow() }, '+ Add user')),
-    saveBtn, msg,
+    saveBtn,
+    el('h3', {}, 'API keys'),
+    el('p', { class: 'fine' }, 'Keys go straight to Mini’s private server and are never shown again, only the last 4 characters. A key added here replaces the one in the server file.'),
+    keys, voiceList, msg,
     el('p', { class: 'fine' }, 'If a choice fails, Mini falls back on her own: API → our server, busy server → API. Recent events:'),
     events.childElementCount ? events : el('p', { class: 'fine' }, 'No events yet.'),
   );
+  if (r.llm?.[s.default.llm_provider]) loadModels(s.default.llm_provider);
 }
 
 export async function initSuperAdmin(root, getToken) {
@@ -130,11 +193,10 @@ export async function initSuperAdmin(root, getToken) {
     if (err.status !== 403 && err.status !== 401) console.warn('super admin unavailable:', err.message);
     return;
   }
-  const save = async (settings) => {
-    await call('POST', { settings });
-    current = await call('GET');
-    render(root, current, save);
+  const api = {
+    post: (body) => call('POST', body),
+    refresh: async () => { current = await call('GET'); render(root, current, api); },
   };
-  render(root, current, save);
+  render(root, current, api);
   root.hidden = false;
 }

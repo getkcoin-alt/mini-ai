@@ -41,9 +41,25 @@ export default async function handler(req, res, { fetchImpl = fetch, worker = ca
   if (!user.email_confirmed_at || !adminEmails().includes(email)) return res.status(403).json({ error: 'Admins only.' });
   try {
     if (req.method === 'GET') return res.status(200).json(await worker('admin/infra', { method: 'GET', timeoutMs: 6000 }));
-    const settings = req.body?.settings;
-    if (!settings || typeof settings !== 'object') return res.status(422).json({ error: 'settings required' });
-    return res.status(200).json(await worker('admin/infra', { method: 'POST', body: { settings, by: email }, timeoutMs: 6000 }));
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const action = body.action || 'settings';
+    if (action === 'settings') {
+      if (!body.settings || typeof body.settings !== 'object') return res.status(422).json({ error: 'settings required' });
+      return res.status(200).json(await worker('admin/infra', { method: 'POST', body: { settings: body.settings, by: email }, timeoutMs: 6000 }));
+    }
+    if (action === 'set_key' || action === 'remove_key') {
+      // The key passes straight to the private worker over HTTPS; it is never logged or returned.
+      if (typeof body.name !== 'string' || (action === 'set_key' && typeof body.value !== 'string'))
+        return res.status(422).json({ error: 'name and value required' });
+      return res.status(200).json(await worker('admin/keys', { method: 'POST', timeoutMs: 6000,
+        body: { action: action === 'set_key' ? 'set' : 'remove', name: body.name,
+          ...(action === 'set_key' ? { value: body.value } : {}), by: email } }));
+    }
+    if (action === 'models') {
+      if (typeof body.provider !== 'string') return res.status(422).json({ error: 'provider required' });
+      return res.status(200).json(await worker('admin/models', { method: 'POST', body: { provider: body.provider }, timeoutMs: 15000 }));
+    }
+    return res.status(422).json({ error: 'unknown action' });
   } catch (error) {
     return res.status(error.statusCode && error.statusCode < 600 ? error.statusCode : 502).json({ error: error.message });
   }

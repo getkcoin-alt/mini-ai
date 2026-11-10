@@ -52,3 +52,24 @@ test('admin can read and save; cross-site POST refused', async () => {
     { fetchImpl: userFetch(boss), worker });
   assert.equal(r.statusCode, 403);
 });
+
+test('keys and model lists go to the worker; key value never echoed by the gateway', async () => {
+  Object.assign(process.env, env);
+  const boss = { id: '3', email: 'boss@example.com', email_confirmed_at: 'x' };
+  const calls = [];
+  const worker = async (path, opts) => { calls.push([path, opts.body]); return { saved: true, keys: { MINI_GROQ_API_KEY: { set: true, hint: '…1234' } } }; };
+  let r = res();
+  await handler({ method: 'POST', headers: auth, body: { action: 'set_key', name: 'MINI_GROQ_API_KEY', value: 'gsk_secret_value_1234' } }, r,
+    { fetchImpl: userFetch(boss), worker });
+  assert.equal(r.statusCode, 200);
+  assert.deepEqual(calls[0], ['admin/keys', { action: 'set', name: 'MINI_GROQ_API_KEY', value: 'gsk_secret_value_1234', by: 'boss@example.com' }]);
+  assert.ok(!JSON.stringify(r.body).includes('gsk_secret_value'));
+  r = res();
+  await handler({ method: 'POST', headers: auth, body: { action: 'models', provider: 'groq' } }, r, { fetchImpl: userFetch(boss), worker });
+  assert.deepEqual(calls[1], ['admin/models', { provider: 'groq' }]);
+  r = res();
+  await handler({ method: 'POST', headers: auth, body: { action: 'set_key', name: 'MINI_GROQ_API_KEY', value: 'x' } }, r,
+    { fetchImpl: userFetch({ id: '9', email: 'nobody@example.com', email_confirmed_at: 'x' }), worker });
+  assert.equal(r.statusCode, 403);
+  assert.equal(calls.length, 2);
+});
