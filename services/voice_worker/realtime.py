@@ -566,6 +566,7 @@ class MiniRealtimeSession:
                 transcript = await cloud.transcribe(audio_samples)
             except cloud.ProviderError as exc:
                 infra.record("fallback", "stt", "groq", str(exc))
+                self.plan["stt"] = "local"  # stay local for the rest of this conversation
         if transcript is None:
             transcript = await loop.run_in_executor(None, _do_stt)
         stt_ms = (time.perf_counter() - t0) * 1000
@@ -748,6 +749,7 @@ class MiniRealtimeSession:
                 return
             except cloud.ProviderError as exc:
                 infra.record("fallback", "llm", self.plan["llm_provider"], str(exc))
+                self.plan["llm"] = "local"
                 if produced:
                     return  # half a reply already spoken; do not start a second one
         async with httpx.AsyncClient(timeout=60.0, trust_env=False) as client:
@@ -832,6 +834,7 @@ class MiniRealtimeSession:
                 return
             except cloud.ProviderError as exc:
                 infra.record("fallback", "tts", "resemble", str(exc))
+                self.plan["tts"] = "local"
                 if produced:
                     return
         if os.environ.get("MINI_STREAMING_TTS", "0") != "1":
