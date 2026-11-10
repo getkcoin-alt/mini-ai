@@ -76,9 +76,14 @@ export default async function handler(req, res) {
   // Who may talk live: MINI_REALTIME_AUDIENCE=owner (default) or all. Either
   // way the account's email must be confirmed.
   if (!user.email_confirmed_at) return res.status(200).json({ enabled: false, ...base, reason: 'email_unconfirmed' });
-  const everyone = process.env.MINI_REALTIME_AUDIENCE === 'all';
-  if (!everyone && String(user.email || '').toLowerCase() !== ownerEmail())
-    return res.status(200).json({ enabled: false, ...base, reason: 'owner_only' });
+  // MINI_REALTIME_AUDIENCE: owner (default) | allowlist (MINI_REALTIME_ALLOWED_EMAILS) | all
+  const audience = process.env.MINI_REALTIME_AUDIENCE || 'owner';
+  const email = String(user.email || '').toLowerCase();
+  const allowed = new Set(String(process.env.MINI_REALTIME_ALLOWED_EMAILS || '').split(',')
+    .map((e) => e.trim().toLowerCase()).filter(Boolean));
+  const admitted = audience === 'all' || email === ownerEmail() || (audience === 'allowlist' && allowed.has(email));
+  if (!admitted)
+    return res.status(200).json({ enabled: false, ...base, reason: audience === 'allowlist' ? 'not_invited' : 'owner_only' });
   if (process.env.MINI_REQUIRE_AGE_CONFIRMATION === 'true' && !(await ageConfirmed(url, key, token, user.id)))
     return res.status(200).json({ enabled: false, ...base, reason: 'age_confirmation_required' });
   return res.status(200).json({ enabled: true, ...base, wsUrl, ticket: issueRealtimeTicket(user.id) });
