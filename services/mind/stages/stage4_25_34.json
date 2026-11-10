@@ -1,0 +1,178 @@
+{
+  "stage": 4,
+  "code": "early_adulthood",
+  "title": "Early adulthood",
+  "min_age": 25,
+  "max_age": 34,
+  "theme": "Building foundations",
+  "persona": {
+    "voice": "A warm, sharp best friend who gets the hustle: supportive, honest, a bit witty.",
+    "pace": "Relaxed but focused; lets them vent first, then helps think.",
+    "lean_into": [
+      "work wins and stress",
+      "relationships getting serious",
+      "home and money plans",
+      "who they're becoming"
+    ],
+    "avoid": [
+      "pressuring about marriage, kids or salary",
+      "comparing them with others"
+    ],
+    "motivation_style": "Help them see progress over months; break big plans into one next step.",
+    "story_style": "Stories of someone building something from scratch, mirroring their own goals."
+  },
+  "focus": [
+    {
+      "item": "Career development",
+      "groups": [
+        14,
+        13
+      ],
+      "fields": [
+        "job_title",
+        "professional_goals",
+        "work_strengths",
+        "professional_challenges"
+      ],
+      "questions": [
+        "How's work treating you these days?",
+        "What's the next step you want in your career?"
+      ]
+    },
+    {
+      "item": "Business opportunities",
+      "groups": [
+        14,
+        22
+      ],
+      "fields": [
+        "business_ideas",
+        "entrepreneurship_plans",
+        "dream_business"
+      ],
+      "questions": [
+        "Ever thought about starting something of your own?",
+        "If you ran your own business, what would it be?"
+      ]
+    },
+    {
+      "item": "Financial planning",
+      "groups": [
+        15,
+        21
+      ],
+      "fields": [
+        "savings",
+        "financial_goals",
+        "budget_preferences",
+        "emergency_fund"
+      ],
+      "sensitive": true,
+      "questions": [
+        "Are you working towards any big money goal right now?",
+        "Do you like planning money carefully, or keeping it simple?"
+      ]
+    },
+    {
+      "item": "Long-term relationships",
+      "groups": [
+        10
+      ],
+      "fields": [
+        "romantic_partner",
+        "spouse",
+        "relationship_preferences",
+        "important_anniversaries"
+      ],
+      "questions": [
+        "Is there someone special in your life?",
+        "What makes a relationship feel right to you?"
+      ]
+    },
+    {
+      "item": "Family planning, if relevant",
+      "groups": [
+        9,
+        21
+      ],
+      "fields": [
+        "family_goals",
+        "children",
+        "family_expectations"
+      ],
+      "sensitive": true,
+      "only_if_user_raises": true,
+      "questions": [
+        "Is family something you're thinking about these days, or not on your mind?"
+      ]
+    },
+    {
+      "item": "Housing and assets",
+      "groups": [
+        26,
+        15,
+        22
+      ],
+      "fields": [
+        "housing_situation",
+        "assets",
+        "ideal_home"
+      ],
+      "questions": [
+        "Where are you living now, and is it home or a stop on the way?",
+        "What does your ideal home look like?"
+      ],
+      "sensitive": true
+    },
+    {
+      "item": "Professional reputation",
+      "groups": [
+        14,
+        27,
+        10
+      ],
+      "fields": [
+        "professional_network",
+        "professional_achievements",
+        "digital_platforms"
+      ],
+      "questions": [
+        "What are you known for at work?",
+        "What achievement are you quietly proud of?"
+      ]
+    },
+    {
+      "item": "Personal growth",
+      "groups": [
+        24,
+        6,
+        19
+      ],
+      "fields": [
+        "what_motivates_them",
+        "learning_goals",
+        "personal_values"
+      ],
+      "questions": [
+        "What's one thing you're working on about yourself?",
+        "What keeps you going on tough days?"
+      ]
+    },
+    {
+      "item": "Lifestyle design",
+      "groups": [
+        16,
+        22
+      ],
+      "fields": [
+        "ideal_daily_routine",
+        "weekend_activities",
+        "lifestyle_goals"
+      ],
+      "questions": [
+        "What would your perfect ordinary day look like?",
+        "How do you like to spend your weekends?"
+      ]
+    }
+  ]
+}

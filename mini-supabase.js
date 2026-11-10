@@ -191,3 +191,94 @@ export async function deleteMiniAccount() {
   if (error) throw error;
   await client.auth.signOut({ scope: 'local' });
 }
+
+/* ---------------- Mini's mind (docs/HUMAN-INTELLIGENCE-DATABASE.md) ---------------- */
+async function mindUser() {
+  if (!client) throw new Error('Authentication unavailable.');
+  const user = await currentMiniUser();
+  if (!user) throw new Error('Sign in first.');
+  return user;
+}
+
+/** Consent scopes: learn_from_conversations, proactive_followups, … */
+export async function mindConsents() {
+  const user = await mindUser();
+  const { data, error } = await client.from('mind_consents').select('scope').eq('user_id', user.id).is('revoked_at', null);
+  if (error) throw error;
+  return new Set((data || []).map((r) => r.scope));
+}
+
+export async function setMindConsent(scope, granted) {
+  const user = await mindUser();
+  if (granted) {
+    const { error } = await client.from('mind_consents').insert({ user_id: user.id, scope });
+    if (error && error.code !== '23505') throw error;   // already granted
+  } else {
+    const { error } = await client.from('mind_consents').update({ revoked_at: new Date().toISOString() })
+      .eq('user_id', user.id).eq('scope', scope).is('revoked_at', null);
+    if (error) throw error;
+  }
+}
+
+/** What Mini knows (confirmed) and what it noticed (waiting for "keep?"). */
+export async function mindFacts() {
+  const user = await mindUser();
+  const { data, error } = await client.from('mind_facts')
+    .select('id,group_id,attribute_name,value,source,consent_status,sensitivity_level,updated_at')
+    .eq('user_id', user.id).eq('status', 'active').neq('consent_status', 'revoked')
+    .order('updated_at', { ascending: false }).limit(200);
+  if (error) throw error;
+  return {
+    known: (data || []).filter((f) => f.consent_status === 'granted'),
+    pending: (data || []).filter((f) => f.consent_status === 'pending'),
+  };
+}
+
+export async function keepMindFact(id) {
+  await mindUser();
+  const { error } = await client.from('mind_facts').update({
+    source: 'user_confirmed', verification_status: 'user_confirmed', consent_status: 'granted',
+    confidence: 0.95, last_confirmed_at: new Date().toISOString()
+  }).eq('id', id);
+  if (error) throw error;
+}
+
+export async function rejectMindFact(id) {
+  await mindUser();
+  const { error } = await client.from('mind_facts').update({ consent_status: 'revoked', status: 'deleted' }).eq('id', id);
+  if (error) throw error;
+}
+
+export async function forgetMindFact(id) {
+  await mindUser();
+  const { error } = await client.from('mind_facts').delete().eq('id', id);
+  if (error) throw error;
+}
+
+/** Something the person tells Mini directly in the app (always theirs, never a guess). */
+export async function tellMind({ kind, text }) {
+  const user = await mindUser();
+  const value = String(text || '').trim();
+  if (!value || value.length > 300) throw new Error('Write something short.');
+  if (kind === 'goal') {
+    const { error } = await client.from('mind_goals').insert({ user_id: user.id, title: value, source: 'user_stated' });
+    if (error) throw error; return;
+  }
+  const map = {
+    fact: ['things_they_want_remembered', 29, 'Want remembered'],
+    preference: [null, 18, 'Likes'],
+    project: [null, 29, 'Working on'],
+  }[kind] || [null, 29, 'About me'];
+  const { error } = await client.from('mind_facts').insert({
+    user_id: user.id, field_key: map[0], group_id: map[1], attribute_name: map[2], value,
+    source: 'user_stated', sensitivity_level: 'L1'
+  });
+  if (error) throw error;
+}
+
+export async function mindSyncScore() {
+  await mindUser();
+  const { data, error } = await client.rpc('mind_sync_score');
+  if (error) throw error;
+  return data || null;
+}
