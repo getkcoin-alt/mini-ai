@@ -229,3 +229,12 @@ input:focus, textarea:focus, select:focus { border-color: var(--purple); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* Mind */
+.top-chips { display: flex; gap: 8px; align-items: center; }
+.chip.sync { display: inline-flex; align-items: center; color: var(--aqua); border-color: rgba(142, 235, 225, .3); font-size: .8rem; }
+.noticed { margin: 6px 0 20px; padding: 14px; border-radius: 20px; background: rgba(181, 160, 255, .08); border: 1px solid rgba(181, 160, 255, .25); }
+.noticed h3 { font-size: 1rem; margin: 0 0 10px; }
+.keep-actions { display: flex; gap: 8px; margin-top: 10px; }
+.keep-actions .btn { min-height: 40px; padding: 0 16px; font-size: .9rem; }
+.mem-item.pending { flex-direction: column; }

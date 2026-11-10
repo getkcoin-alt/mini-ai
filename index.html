@@ -105,7 +105,10 @@
           <p class="eyebrow" id="greet-time">Good evening</p>
           <h1 class="greet" id="greet-name">Hi there</h1>
         </div>
-        <button class="chip" id="mode-chip" type="button" aria-label="Switch between Friend and Mentor">♡ Friend</button>
+        <div class="top-chips">
+          <span class="chip sync hidden" id="sync-chip" title="How well Mini knows you so far">Mini knows you 0%</span>
+          <button class="chip" id="mode-chip" type="button" aria-label="Switch between Friend and Mentor">♡ Friend</button>
+        </div>
       </header>
 
       <main class="panels">
@@ -133,7 +136,11 @@
         <section class="panel" id="p-memories" aria-labelledby="mem-title" hidden>
           <div class="page-pad">
             <h2 id="mem-title">What Mini remembers</h2>
-            <p class="hint">Only you can see these. Mini uses them to know you better. Delete anything, anytime.</p>
+            <p class="hint">Only you can see these. Mini learns them from your talks and uses them to know you better. Delete anything, anytime.</p>
+            <div class="noticed hidden" id="noticed">
+              <h3>Mini noticed… keep?</h3>
+              <ul class="mem-list" id="noticed-list"></ul>
+            </div>
             <form id="mem-form" class="mem-form">
               <select id="mem-kind" aria-label="Kind of memory">
                 <option value="fact">About me</option>
@@ -183,6 +190,7 @@
             <h2 id="set-title">Settings</h2>
             <ul class="settings">
               <li><label class="row"><span><strong>Show captions</strong><small>See what you and Mini say</small></span><input type="checkbox" id="set-captions" class="switch" checked></label></li>
+              <li><label class="row"><span><strong>Mini learns from our talks</strong><small>Remembers your day, people and goals. You review it in Memories.</small></span><input type="checkbox" id="set-learn" class="switch"></label></li>
               <li class="hidden" id="install-row"><button class="row" id="btn-install" type="button"><span><strong>Install Mini</strong><small>Add Mini to your home screen</small></span><span aria-hidden="true">›</span></button></li>
               <li><a class="row" href="/privacy.html"><span><strong>Privacy Policy</strong><small>What Mini stores and why</small></span><span aria-hidden="true">›</span></a></li>
               <li><a class="row" href="/terms.html"><span><strong>Terms</strong><small>Using Mini</small></span><span aria-hidden="true">›</span></a></li>

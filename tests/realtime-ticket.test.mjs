@@ -4,7 +4,7 @@ import { createHmac } from 'node:crypto';
 import handler, { issueRealtimeTicket } from '../api/voice/realtime-config.js';
 import { miniLiveWsUrl } from '../mini-realtime-protocol.js';
 
-const KEYS = ['MINI_REALTIME_AUDIENCE', 'MINI_REQUIRE_AGE_CONFIRMATION', 'MINI_WORKER_TOKEN', 'MINI_OWNER_EMAIL', 'MINI_SUPABASE_URL', 'MINI_SUPABASE_PUBLISHABLE_KEY',
+const KEYS = ['MINI_REALTIME_ALLOWED_EMAILS', 'MINI_REALTIME_AUDIENCE', 'MINI_REQUIRE_AGE_CONFIRMATION', 'MINI_WORKER_TOKEN', 'MINI_OWNER_EMAIL', 'MINI_SUPABASE_URL', 'MINI_SUPABASE_PUBLISHABLE_KEY',
   'MINI_REALTIME_ENABLED', 'MINI_REALTIME_GATEWAY_READY', 'MINI_REALTIME_WS_URL'];
 const saved = Object.fromEntries(KEYS.map((k) => [k, process.env[k]]));
 const realFetch = globalThis.fetch;
@@ -73,4 +73,16 @@ test('18+ gate reads the user profile when required', async () => {
     if (!enabled) assert.equal(res.body.reason, 'age_confirmation_required');
   }
   delete process.env.MINI_REALTIME_AUDIENCE; delete process.env.MINI_REQUIRE_AGE_CONFIRMATION;
+});
+
+test('allowlist admits exactly the invited people (plus the owner)', async () => {
+  env(); process.env.MINI_REALTIME_AUDIENCE = 'allowlist';
+  process.env.MINI_REALTIME_ALLOWED_EMAILS = ' Him@Example.com , her@example.com ';
+  for (const [email, ok] of [['him@example.com', true], ['HER@example.com', true], ['owner@example.com', true], ['stranger@example.com', false]]) {
+    supaUser({ id: 'u-' + email, email, email_confirmed_at: '2026-11-10' });
+    const res = await call();
+    assert.equal(res.body.enabled, ok, email);
+    if (!ok) assert.equal(res.body.reason, 'not_invited');
+  }
+  delete process.env.MINI_REALTIME_AUDIENCE; delete process.env.MINI_REALTIME_ALLOWED_EMAILS;
 });
