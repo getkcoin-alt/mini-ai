@@ -1,0 +1,5920 @@
+{
+  "version": "1.0.0",
+  "source": "docs/HUMAN-INTELLIGENCE-DATABASE.md",
+  "access_levels": {
+    "L0": "Public",
+    "L1": "Personal preferences",
+    "L2": "Private context",
+    "L3": "Sensitive (health, finances, intimate experiences)",
+    "L4": "Highly restricted (identity documents, precise location, protected records)"
+  },
+  "intelligence_layers": [
+    "descriptive",
+    "contextual",
+    "temporal",
+    "predictive",
+    "partnership"
+  ],
+  "sources": [
+    "user_stated",
+    "user_confirmed",
+    "ai_observed",
+    "ai_hypothesis",
+    "imported"
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "title": "Identity & personal information",
+      "intro": "The fundamental identity layer.",
+      "notes": [],
+      "fields": [
+        {
+          "key": "unique_human_profile_id",
+          "label": "Unique human profile ID",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "legal_name",
+          "label": "Legal name",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "preferred_name",
+          "label": "Preferred name",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "nickname",
+          "label": "Nickname",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "previous_names",
+          "label": "Previous names",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "date_of_birth",
+          "label": "Date of birth",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "date"
+        },
+        {
+          "key": "age",
+          "label": "Age",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "integer"
+        },
+        {
+          "key": "gender_identity",
+          "label": "Gender identity (optional)",
+          "optional": true,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "pronouns",
+          "label": "Pronouns (optional)",
+          "optional": true,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "country_of_birth",
+          "label": "Country of birth",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "current_country",
+          "label": "Current country",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "nationality",
+          "label": "Nationality",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "citizenship",
+          "label": "Citizenship",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "place_of_residence",
+          "label": "Place of residence",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "time_zone",
+          "label": "Time zone",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "native_language",
+          "label": "Native language",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "other_languages",
+          "label": "Other languages",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "list"
+        },
+        {
+          "key": "preferred_language",
+          "label": "Preferred language",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "cultural_background",
+          "label": "Cultural background",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "marital_status",
+          "label": "Marital status (optional)",
+          "optional": true,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "personal_identification_documents",
+          "label": "Personal identification documents (only when necessary and authorized)",
+          "optional": false,
+          "level": "L4",
+          "never_store": true,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "preferred_units",
+          "label": "Preferred units (metric/imperial)",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "preferred_date_and_time_formats",
+          "label": "Preferred date and time formats",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "accessibility_requirements",
+          "label": "Accessibility requirements",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "emergency_contact_preferences",
+          "label": "Emergency contact preferences",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        }
+      ],
+      "meaning": "Who the person is",
+      "default_level": "L2",
+      "ai_may_infer": true
+    },
+    {
+      "id": 2,
+      "title": "Physical characteristics",
+      "intro": "",
+      "notes": [],
+      "fields": [
+        {
+          "key": "height",
+          "label": "Height",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "measurement"
+        },
+        {
+          "key": "body_measurements",
+          "label": "Body measurements (optional)",
+          "optional": true,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "measurement"
+        },
+        {
+          "key": "physical_appearance_preferences",
+          "label": "Physical appearance preferences",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "hair_preferences",
+          "label": "Hair preferences",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "eye_colour",
+          "label": "Eye colour (optional)",
+          "optional": true,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "dominant_hand",
+          "label": "Dominant hand",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "mobility_capabilities",
+          "label": "Mobility capabilities",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "physical_limitations",
+          "label": "Physical limitations",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "hearing_accessibility",
+          "label": "Hearing accessibility",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "vision_accessibility",
+          "label": "Vision accessibility",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "sensory_sensitivities",
+          "label": "Sensory sensitivities",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "physical_fitness_level",
+          "label": "Physical fitness level",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "sports_capabilities",
+          "label": "Sports capabilities",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "physical_activity_preferences",
+          "label": "Physical activity preferences",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "sleep_requirements",
+          "label": "Sleep requirements",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "dietary_preferences",
+          "label": "Dietary preferences",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "food_allergies",
+          "label": "Food allergies",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "clothing_preferences",
+          "label": "Clothing preferences",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "personal_comfort_preferences",
+          "label": "Personal comfort preferences",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        }
+      ],
+      "meaning": "How their body and physical life work",
+      "default_level": "L2",
+      "ai_may_infer": true
+    },
+    {
+      "id": 3,
+      "title": "Health & wellbeing",
+      "intro": "This should be a private, highly protected information domain.",
+      "notes": [
+        "AI should distinguish between medically verified facts, self-reported information, and its own observations. It must not independently diagnose people."
+      ],
+      "fields": [
+        {
+          "key": "general_wellbeing",
+          "label": "General wellbeing",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "medical_history",
+          "label": "Medical history",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "existing_diagnoses",
+          "label": "Existing diagnoses",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "past_illnesses",
+          "label": "Past illnesses",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "surgeries",
+          "label": "Surgeries",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "injuries",
+          "label": "Injuries",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "allergies",
+          "label": "Allergies",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "medication_history",
+          "label": "Medication history",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "current_medications",
+          "label": "Current medications",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "healthcare_providers",
+          "label": "Healthcare providers",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "medical_appointments",
+          "label": "Medical appointments",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "vaccination_records",
+          "label": "Vaccination records",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "family_medical_history",
+          "label": "Family medical history",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "dental_health",
+          "label": "Dental health",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "vision_health",
+          "label": "Vision health",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "sleep_quality",
+          "label": "Sleep quality",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "energy_levels",
+          "label": "Energy levels",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "nutrition_patterns",
+          "label": "Nutrition patterns",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "exercise_habits",
+          "label": "Exercise habits",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "mental_wellbeing",
+          "label": "Mental wellbeing",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "stress_indicators",
+          "label": "Stress indicators",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "chronic_pain",
+          "label": "Chronic pain",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "health_goals",
+          "label": "Health goals",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "medical_preferences",
+          "label": "Medical preferences",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "healthcare_accessibility",
+          "label": "Healthcare accessibility",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "advance_care_preferences",
+          "label": "Advance care preferences (where appropriate)",
+          "optional": true,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        }
+      ],
+      "meaning": "How they are doing",
+      "default_level": "L3",
+      "ai_may_infer": false
+    },
+    {
+      "id": 4,
+      "title": "Personality & temperament",
+      "intro": "",
+      "notes": [],
+      "fields": [
+        {
+          "key": "introversion_extroversion",
+          "label": "Introversion / extroversion",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "social_energy",
+          "label": "Social energy",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "openness_to_new_experiences",
+          "label": "Openness to new experiences",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "conscientiousness",
+          "label": "Conscientiousness",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "agreeableness",
+          "label": "Agreeableness",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "emotional_stability",
+          "label": "Emotional stability",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "patience",
+          "label": "Patience",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "impulsiveness",
+          "label": "Impulsiveness",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "curiosity",
+          "label": "Curiosity",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "creativity",
+          "label": "Creativity",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "independence",
+          "label": "Independence",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "risk_tolerance",
+          "label": "Risk tolerance",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "competitiveness",
+          "label": "Competitiveness",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "sense_of_humour",
+          "label": "Sense of humour",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "confidence",
+          "label": "Confidence",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "adaptability",
+          "label": "Adaptability",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "sensitivity",
+          "label": "Sensitivity",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "leadership_tendencies",
+          "label": "Leadership tendencies",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "cooperation_preferences",
+          "label": "Cooperation preferences",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "conflict_tendencies",
+          "label": "Conflict tendencies",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "need_for_personal_space",
+          "label": "Need for personal space",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "need_for_social_interaction",
+          "label": "Need for social interaction",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "preferred_working_environment",
+          "label": "Preferred working environment",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        }
+      ],
+      "meaning": "How they naturally behave",
+      "default_level": "L1",
+      "ai_may_infer": true
+    },
+    {
+      "id": 5,
+      "title": "Psychology & emotional patterns",
+      "intro": "",
+      "notes": [],
+      "fields": [
+        {
+          "key": "common_emotional_states",
+          "label": "Common emotional states",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "emotional_triggers",
+          "label": "Emotional triggers",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "sources_of_happiness",
+          "label": "Sources of happiness",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "sources_of_frustration",
+          "label": "Sources of frustration",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "sources_of_anxiety",
+          "label": "Sources of anxiety",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "stress_responses",
+          "label": "Stress responses",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "emotional_regulation_techniques",
+          "label": "Emotional regulation techniques",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "coping_mechanisms",
+          "label": "Coping mechanisms",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "reaction_to_criticism",
+          "label": "Reaction to criticism",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "reaction_to_failure",
+          "label": "Reaction to failure",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "reaction_to_rejection",
+          "label": "Reaction to rejection",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "fear_of_uncertainty",
+          "label": "Fear of uncertainty",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "need_for_reassurance",
+          "label": "Need for reassurance",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "need_for_validation",
+          "label": "Need for validation",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "emotional_boundaries",
+          "label": "Emotional boundaries",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "attachment_preferences",
+          "label": "Attachment preferences (only when appropriate and self-reported)",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "conflict_recovery_patterns",
+          "label": "Conflict recovery patterns",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "emotional_support_preferences",
+          "label": "Emotional support preferences",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "situations_where_they_prefer_silence",
+          "label": "Situations where they prefer silence",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "situations_where_they_want_advice",
+          "label": "Situations where they want advice",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "situations_where_they_simply_want_someone_to_listen",
+          "label": "Situations where they simply want someone to listen",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        }
+      ],
+      "meaning": "How they feel and process experiences",
+      "default_level": "L2",
+      "ai_may_infer": true
+    },
+    {
+      "id": 6,
+      "title": "Cognitive abilities & learning",
+      "intro": "",
+      "notes": [],
+      "fields": [
+        {
+          "key": "learning_speed",
+          "label": "Learning speed (self-assessed)",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "learning_preferences",
+          "label": "Learning preferences",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "visual_learning",
+          "label": "Visual learning",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "auditory_learning",
+          "label": "Auditory learning",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "reading_preferences",
+          "label": "Reading preferences",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "practical_learning",
+          "label": "Practical learning",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "analytical_thinking",
+          "label": "Analytical thinking",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "critical_thinking",
+          "label": "Critical thinking",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "logical_reasoning",
+          "label": "Logical reasoning",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "abstract_reasoning",
+          "label": "Abstract reasoning",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "memory_preferences",
+          "label": "Memory preferences",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "attention_patterns",
+          "label": "Attention patterns",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "problem_solving_approach",
+          "label": "Problem-solving approach",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "information_processing_preferences",
+          "label": "Information processing preferences",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "creative_thinking",
+          "label": "Creative thinking",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "decision_complexity_tolerance",
+          "label": "Decision complexity tolerance",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "preferred_explanation_depth",
+          "label": "Preferred explanation depth",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "preferred_examples",
+          "label": "Preferred examples",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "knowledge_gaps",
+          "label": "Knowledge gaps",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "areas_of_expertise",
+          "label": "Areas of expertise",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "learning_goals",
+          "label": "Learning goals",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "study_habits",
+          "label": "Study habits",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "concentration_environment",
+          "label": "Concentration environment",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        }
+      ],
+      "meaning": "How they think and learn",
+      "default_level": "L1",
+      "ai_may_infer": true
+    },
+    {
+      "id": 7,
+      "title": "Communication style",
+      "intro": "",
+      "notes": [],
+      "fields": [
+        {
+          "key": "preferred_language_g07",
+          "label": "Preferred language",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "formality_level",
+          "label": "Formality level",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "short_or_detailed_answers",
+          "label": "Short or detailed answers",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "direct_or_indirect_communication",
+          "label": "Direct or indirect communication",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "humour_preferences",
+          "label": "Humour preferences",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "emoji_preferences",
+          "label": "Emoji preferences",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "voice_or_text_preference",
+          "label": "Voice or text preference",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "preferred_speaking_speed",
+          "label": "Preferred speaking speed",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "reading_complexity",
+          "label": "Reading complexity",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "communication_boundaries",
+          "label": "Communication boundaries",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "preferred_feedback_style",
+          "label": "Preferred feedback style",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "response_to_disagreement",
+          "label": "Response to disagreement",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "preferred_communication_channels",
+          "label": "Preferred communication channels",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "typical_response_times",
+          "label": "Typical response times",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "important_people_to_communicate_with",
+          "label": "Important people to communicate with",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "topics_they_find_uncomfortable",
+          "label": "Topics they find uncomfortable",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "topics_they_enjoy_discussing",
+          "label": "Topics they enjoy discussing",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "how_they_express_urgency",
+          "label": "How they express urgency",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "how_they_ask_for_help",
+          "label": "How they ask for help",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "how_they_prefer_apologies",
+          "label": "How they prefer apologies",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "how_they_prefer_appreciation",
+          "label": "How they prefer appreciation",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        }
+      ],
+      "meaning": "How they express themselves",
+      "default_level": "L1",
+      "ai_may_infer": true
+    },
+    {
+      "id": 8,
+      "title": "Languages & culture",
+      "intro": "",
+      "notes": [],
+      "fields": [
+        {
+          "key": "first_language",
+          "label": "First language",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "languages_spoken",
+          "label": "Languages spoken",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "list"
+        },
+        {
+          "key": "reading_proficiency",
+          "label": "Reading proficiency",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "writing_proficiency",
+          "label": "Writing proficiency",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "speaking_proficiency",
+          "label": "Speaking proficiency",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "regional_dialects",
+          "label": "Regional dialects",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "accent_preferences",
+          "label": "Accent preferences",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "cultural_traditions",
+          "label": "Cultural traditions",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "festivals_celebrated",
+          "label": "Festivals celebrated",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "cultural_etiquette",
+          "label": "Cultural etiquette",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "food_traditions",
+          "label": "Food traditions",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "family_customs",
+          "label": "Family customs",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "regional_expressions",
+          "label": "Regional expressions",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "cultural_sensitivities",
+          "label": "Cultural sensitivities",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "historical_interests",
+          "label": "Historical interests",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "geographic_heritage",
+          "label": "Geographic heritage",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "cultural_identity",
+          "label": "Cultural identity (optional and user-defined)",
+          "optional": true,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        }
+      ],
+      "meaning": "Their linguistic and cultural world",
+      "default_level": "L1",
+      "ai_may_infer": true
+    },
+    {
+      "id": 9,
+      "title": "Family & upbringing",
+      "intro": "",
+      "notes": [],
+      "fields": [
+        {
+          "key": "parents_or_guardians",
+          "label": "Parents or guardians",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "person_list"
+        },
+        {
+          "key": "siblings",
+          "label": "Siblings",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "person_list"
+        },
+        {
+          "key": "children",
+          "label": "Children",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "person_list"
+        },
+        {
+          "key": "grandparents",
+          "label": "Grandparents",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "person_list"
+        },
+        {
+          "key": "extended_family",
+          "label": "Extended family",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "family_structure",
+          "label": "Family structure",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "childhood_household",
+          "label": "Childhood household",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "childhood_environment",
+          "label": "Childhood environment",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "parenting_experiences",
+          "label": "Parenting experiences",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "family_traditions",
+          "label": "Family traditions",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "family_responsibilities",
+          "label": "Family responsibilities",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "important_family_events",
+          "label": "Important family events",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "family_communication_patterns",
+          "label": "Family communication patterns",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "family_relationships",
+          "label": "Family relationships",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "people_they_consider_family",
+          "label": "People they consider family",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "important_family_memories",
+          "label": "Important family memories",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "family_expectations",
+          "label": "Family expectations",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "family_support_system",
+          "label": "Family support system",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        }
+      ],
+      "meaning": "Where they come from",
+      "default_level": "L2",
+      "ai_may_infer": true
+    },
+    {
+      "id": 10,
+      "title": "Relationships & social circle",
+      "intro": "",
+      "notes": [],
+      "fields": [
+        {
+          "key": "friends",
+          "label": "Friends",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "person_list"
+        },
+        {
+          "key": "best_friends",
+          "label": "Best friends",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "person_list"
+        },
+        {
+          "key": "romantic_partner",
+          "label": "Romantic partner",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "person"
+        },
+        {
+          "key": "spouse",
+          "label": "Spouse",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "person"
+        },
+        {
+          "key": "colleagues",
+          "label": "Colleagues",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "person_list"
+        },
+        {
+          "key": "mentors",
+          "label": "Mentors",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "person_list"
+        },
+        {
+          "key": "teachers",
+          "label": "Teachers",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "person_list"
+        },
+        {
+          "key": "professional_network",
+          "label": "Professional network",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "trusted_individuals",
+          "label": "Trusted individuals",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "person_list"
+        },
+        {
+          "key": "social_groups",
+          "label": "Social groups",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "community_membership",
+          "label": "Community membership",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "relationship_preferences",
+          "label": "Relationship preferences",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "important_anniversaries",
+          "label": "Important anniversaries",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "date_list"
+        },
+        {
+          "key": "important_birthdays",
+          "label": "Important birthdays",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "date_list"
+        },
+        {
+          "key": "social_commitments",
+          "label": "Social commitments",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "people_they_avoid",
+          "label": "People they avoid",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "people_they_want_to_reconnect_with",
+          "label": "People they want to reconnect with",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "relationship_boundaries",
+          "label": "Relationship boundaries",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "preferred_ways_of_showing_affection",
+          "label": "Preferred ways of showing affection",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "social_activities",
+          "label": "Social activities",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "support_network",
+          "label": "Support network",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        }
+      ],
+      "meaning": "Who matters to them",
+      "default_level": "L2",
+      "ai_may_infer": true
+    },
+    {
+      "id": 11,
+      "title": "Childhood & life history",
+      "intro": "",
+      "notes": [],
+      "fields": [
+        {
+          "key": "birthplace",
+          "label": "Birthplace",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "childhood_locations",
+          "label": "Childhood locations",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "schools_attended",
+          "label": "Schools attended",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "childhood_interests",
+          "label": "Childhood interests",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "childhood_dreams",
+          "label": "Childhood dreams",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "memorable_experiences",
+          "label": "Memorable experiences",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "childhood_friendships",
+          "label": "Childhood friendships",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "important_teachers",
+          "label": "Important teachers",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "family_environment",
+          "label": "Family environment",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "major_life_transitions",
+          "label": "Major life transitions",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "significant_achievements",
+          "label": "Significant achievements",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "personal_failures",
+          "label": "Personal failures",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "life_changing_events",
+          "label": "Life-changing events",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "travel_history",
+          "label": "Travel history",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "places_lived",
+          "label": "Places lived",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "important_decisions",
+          "label": "Important decisions",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "personal_milestones",
+          "label": "Personal milestones",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "stories_they_want_preserved",
+          "label": "Stories they want preserved",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "experiences_they_do_not_want_ai_to_revisit",
+          "label": "Experiences they do not want AI to revisit",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        }
+      ],
+      "meaning": "What shaped their journey",
+      "default_level": "L2",
+      "ai_may_infer": true
+    },
+    {
+      "id": 12,
+      "title": "Education & knowledge",
+      "intro": "",
+      "notes": [],
+      "fields": [
+        {
+          "key": "school_history",
+          "label": "School history",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "university_history",
+          "label": "University history",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "degrees",
+          "label": "Degrees",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "certifications",
+          "label": "Certifications",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "academic_performance",
+          "label": "Academic performance (if relevant)",
+          "optional": true,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "subjects_studied",
+          "label": "Subjects studied",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "favourite_subjects",
+          "label": "Favourite subjects",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "least_favourite_subjects",
+          "label": "Least favourite subjects",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "self_taught_knowledge",
+          "label": "Self-taught knowledge",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "courses_completed",
+          "label": "Courses completed",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "books_read",
+          "label": "Books read",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "research_interests",
+          "label": "Research interests",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "educational_goals",
+          "label": "Educational goals",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "knowledge_expertise",
+          "label": "Knowledge expertise",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "current_learning_projects",
+          "label": "Current learning projects",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "preferred_teaching_style",
+          "label": "Preferred teaching style",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "academic_achievements",
+          "label": "Academic achievements",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        }
+      ],
+      "meaning": "What they know",
+      "default_level": "L1",
+      "ai_may_infer": true
+    },
+    {
+      "id": 13,
+      "title": "Skills & capabilities",
+      "intro": "",
+      "notes": [],
+      "fields": [
+        {
+          "key": "technical_skills",
+          "label": "Technical skills",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "communication_skills",
+          "label": "Communication skills",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "creative_skills",
+          "label": "Creative skills",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "management_skills",
+          "label": "Management skills",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "leadership_skills",
+          "label": "Leadership skills",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "physical_skills",
+          "label": "Physical skills",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "languages",
+          "label": "Languages",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "negotiation_skills",
+          "label": "Negotiation skills",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "analytical_skills",
+          "label": "Analytical skills",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "financial_literacy",
+          "label": "Financial literacy",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "entrepreneurial_abilities",
+          "label": "Entrepreneurial abilities",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "artistic_abilities",
+          "label": "Artistic abilities",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "problem_solving_abilities",
+          "label": "Problem-solving abilities",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "certifications_g13",
+          "label": "Certifications",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "skill_proficiency_levels",
+          "label": "Skill proficiency levels",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "years_of_experience",
+          "label": "Years of experience",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "integer"
+        },
+        {
+          "key": "skills_under_development",
+          "label": "Skills under development",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "skills_they_want_to_acquire",
+          "label": "Skills they want to acquire",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "skills_they_want_to_monetize",
+          "label": "Skills they want to monetize",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        }
+      ],
+      "meaning": "What they can do",
+      "default_level": "L1",
+      "ai_may_infer": true
+    },
+    {
+      "id": 14,
+      "title": "Career & professional life",
+      "intro": "",
+      "notes": [],
+      "fields": [
+        {
+          "key": "current_profession",
+          "label": "Current profession",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "current_employer",
+          "label": "Current employer",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "job_title",
+          "label": "Job title",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "employment_history",
+          "label": "Employment history",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "business_ownership",
+          "label": "Business ownership",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "professional_goals",
+          "label": "Professional goals",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "income_expectations",
+          "label": "Income expectations",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "career_ambitions",
+          "label": "Career ambitions",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "work_schedule",
+          "label": "Work schedule",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "work_environment",
+          "label": "Work environment",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "management_preferences",
+          "label": "Management preferences",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "team_relationships",
+          "label": "Team relationships",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "professional_network_g14",
+          "label": "Professional network",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "work_strengths",
+          "label": "Work strengths",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "work_weaknesses",
+          "label": "Work weaknesses",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "professional_challenges",
+          "label": "Professional challenges",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "industry_interests",
+          "label": "Industry interests",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "business_ideas",
+          "label": "Business ideas",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "entrepreneurship_plans",
+          "label": "Entrepreneurship plans",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "preferred_working_arrangements",
+          "label": "Preferred working arrangements",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "retirement_plans",
+          "label": "Retirement plans",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "professional_achievements",
+          "label": "Professional achievements",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "career_risks",
+          "label": "Career risks",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        }
+      ],
+      "meaning": "How they work",
+      "default_level": "L2",
+      "ai_may_infer": true
+    },
+    {
+      "id": 15,
+      "title": "Financial life",
+      "intro": "",
+      "notes": [
+        "This information should be compartmentalized. An AI helping with education doesn't need access to someone's bank balance."
+      ],
+      "fields": [
+        {
+          "key": "income_sources",
+          "label": "Income sources",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "monthly_income",
+          "label": "Monthly income",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "money"
+        },
+        {
+          "key": "monthly_expenses",
+          "label": "Monthly expenses",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "money"
+        },
+        {
+          "key": "savings",
+          "label": "Savings",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "money"
+        },
+        {
+          "key": "investments",
+          "label": "Investments",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "assets",
+          "label": "Assets",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "liabilities",
+          "label": "Liabilities",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "loans",
+          "label": "Loans",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "credit_obligations",
+          "label": "Credit obligations",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "insurance",
+          "label": "Insurance",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "financial_dependants",
+          "label": "Financial dependants",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "emergency_fund",
+          "label": "Emergency fund",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "financial_literacy_g15",
+          "label": "Financial literacy",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "spending_habits",
+          "label": "Spending habits",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "saving_habits",
+          "label": "Saving habits",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "risk_appetite",
+          "label": "Risk appetite",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "financial_goals",
+          "label": "Financial goals",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "retirement_planning",
+          "label": "Retirement planning",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "tax_obligations",
+          "label": "Tax obligations",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "budget_preferences",
+          "label": "Budget preferences",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "financial_commitments",
+          "label": "Financial commitments",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "wealth_building_strategy",
+          "label": "Wealth-building strategy",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "financial_stressors",
+          "label": "Financial stressors",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        }
+      ],
+      "meaning": "How they manage resources",
+      "default_level": "L3",
+      "ai_may_infer": false
+    },
+    {
+      "id": 16,
+      "title": "Daily lifestyle & routines",
+      "intro": "",
+      "notes": [],
+      "fields": [
+        {
+          "key": "wake_up_time",
+          "label": "Wake-up time",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "time"
+        },
+        {
+          "key": "sleep_time",
+          "label": "Sleep time",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "time"
+        },
+        {
+          "key": "morning_routine",
+          "label": "Morning routine",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "evening_routine",
+          "label": "Evening routine",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "work_hours",
+          "label": "Work hours",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "meal_schedules",
+          "label": "Meal schedules",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "exercise_schedule",
+          "label": "Exercise schedule",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "study_schedule",
+          "label": "Study schedule",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "household_responsibilities",
+          "label": "Household responsibilities",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "personal_hygiene_routines",
+          "label": "Personal hygiene routines",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "travel_routines",
+          "label": "Travel routines",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "productivity_habits",
+          "label": "Productivity habits",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "weekend_activities",
+          "label": "Weekend activities",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "daily_priorities",
+          "label": "Daily priorities",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "time_management_preferences",
+          "label": "Time-management preferences",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "energy_patterns",
+          "label": "Energy patterns",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "rest_preferences",
+          "label": "Rest preferences",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "personal_rituals",
+          "label": "Personal rituals",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "lifestyle_goals",
+          "label": "Lifestyle goals",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        }
+      ],
+      "meaning": "How they live",
+      "default_level": "L1",
+      "ai_may_infer": true
+    },
+    {
+      "id": 17,
+      "title": "Interests & hobbies",
+      "intro": "",
+      "notes": [
+        "For each interest, record enthusiasm, experience, frequency, and whether it is current or historical."
+      ],
+      "fields": [
+        {
+          "key": "sports",
+          "label": "Sports",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text",
+          "facets": [
+            "enthusiasm",
+            "experience",
+            "frequency",
+            "current_or_historical"
+          ]
+        },
+        {
+          "key": "music",
+          "label": "Music",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text",
+          "facets": [
+            "enthusiasm",
+            "experience",
+            "frequency",
+            "current_or_historical"
+          ]
+        },
+        {
+          "key": "art",
+          "label": "Art",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text",
+          "facets": [
+            "enthusiasm",
+            "experience",
+            "frequency",
+            "current_or_historical"
+          ]
+        },
+        {
+          "key": "technology",
+          "label": "Technology",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text",
+          "facets": [
+            "enthusiasm",
+            "experience",
+            "frequency",
+            "current_or_historical"
+          ]
+        },
+        {
+          "key": "science",
+          "label": "Science",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text",
+          "facets": [
+            "enthusiasm",
+            "experience",
+            "frequency",
+            "current_or_historical"
+          ]
+        },
+        {
+          "key": "history",
+          "label": "History",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text",
+          "facets": [
+            "enthusiasm",
+            "experience",
+            "frequency",
+            "current_or_historical"
+          ]
+        },
+        {
+          "key": "philosophy",
+          "label": "Philosophy",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text",
+          "facets": [
+            "enthusiasm",
+            "experience",
+            "frequency",
+            "current_or_historical"
+          ]
+        },
+        {
+          "key": "literature",
+          "label": "Literature",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text",
+          "facets": [
+            "enthusiasm",
+            "experience",
+            "frequency",
+            "current_or_historical"
+          ]
+        },
+        {
+          "key": "gaming",
+          "label": "Gaming",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text",
+          "facets": [
+            "enthusiasm",
+            "experience",
+            "frequency",
+            "current_or_historical"
+          ]
+        },
+        {
+          "key": "travelling",
+          "label": "Travelling",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text",
+          "facets": [
+            "enthusiasm",
+            "experience",
+            "frequency",
+            "current_or_historical"
+          ]
+        },
+        {
+          "key": "photography",
+          "label": "Photography",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text",
+          "facets": [
+            "enthusiasm",
+            "experience",
+            "frequency",
+            "current_or_historical"
+          ]
+        },
+        {
+          "key": "cooking",
+          "label": "Cooking",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text",
+          "facets": [
+            "enthusiasm",
+            "experience",
+            "frequency",
+            "current_or_historical"
+          ]
+        },
+        {
+          "key": "gardening",
+          "label": "Gardening",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text",
+          "facets": [
+            "enthusiasm",
+            "experience",
+            "frequency",
+            "current_or_historical"
+          ]
+        },
+        {
+          "key": "fitness",
+          "label": "Fitness",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text",
+          "facets": [
+            "enthusiasm",
+            "experience",
+            "frequency",
+            "current_or_historical"
+          ]
+        },
+        {
+          "key": "nature",
+          "label": "Nature",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text",
+          "facets": [
+            "enthusiasm",
+            "experience",
+            "frequency",
+            "current_or_historical"
+          ]
+        },
+        {
+          "key": "fashion",
+          "label": "Fashion",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text",
+          "facets": [
+            "enthusiasm",
+            "experience",
+            "frequency",
+            "current_or_historical"
+          ]
+        },
+        {
+          "key": "business",
+          "label": "Business",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text",
+          "facets": [
+            "enthusiasm",
+            "experience",
+            "frequency",
+            "current_or_historical"
+          ]
+        },
+        {
+          "key": "entrepreneurship",
+          "label": "Entrepreneurship",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text",
+          "facets": [
+            "enthusiasm",
+            "experience",
+            "frequency",
+            "current_or_historical"
+          ]
+        },
+        {
+          "key": "space",
+          "label": "Space",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text",
+          "facets": [
+            "enthusiasm",
+            "experience",
+            "frequency",
+            "current_or_historical"
+          ]
+        },
+        {
+          "key": "psychology",
+          "label": "Psychology",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text",
+          "facets": [
+            "enthusiasm",
+            "experience",
+            "frequency",
+            "current_or_historical"
+          ]
+        },
+        {
+          "key": "automobiles",
+          "label": "Automobiles",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text",
+          "facets": [
+            "enthusiasm",
+            "experience",
+            "frequency",
+            "current_or_historical"
+          ]
+        },
+        {
+          "key": "architecture",
+          "label": "Architecture",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text",
+          "facets": [
+            "enthusiasm",
+            "experience",
+            "frequency",
+            "current_or_historical"
+          ]
+        },
+        {
+          "key": "collecting",
+          "label": "Collecting",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text",
+          "facets": [
+            "enthusiasm",
+            "experience",
+            "frequency",
+            "current_or_historical"
+          ]
+        },
+        {
+          "key": "volunteering",
+          "label": "Volunteering",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text",
+          "facets": [
+            "enthusiasm",
+            "experience",
+            "frequency",
+            "current_or_historical"
+          ]
+        },
+        {
+          "key": "other_personal_interests",
+          "label": "Other personal interests",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text",
+          "facets": [
+            "enthusiasm",
+            "experience",
+            "frequency",
+            "current_or_historical"
+          ]
+        }
+      ],
+      "meaning": "What attracts them",
+      "default_level": "L1",
+      "ai_may_infer": true
+    },
+    {
+      "id": 18,
+      "title": "Entertainment & preferences",
+      "intro": "",
+      "notes": [],
+      "fields": [
+        {
+          "key": "favourite_music",
+          "label": "Favourite music",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "favourite_artists",
+          "label": "Favourite artists",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "favourite_genres",
+          "label": "Favourite genres",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "favourite_movies",
+          "label": "Favourite movies",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "favourite_shows",
+          "label": "Favourite shows",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "favourite_books",
+          "label": "Favourite books",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "favourite_authors",
+          "label": "Favourite authors",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "favourite_games",
+          "label": "Favourite games",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "favourite_podcasts",
+          "label": "Favourite podcasts",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "favourite_creators",
+          "label": "Favourite creators",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "favourite_websites",
+          "label": "Favourite websites",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "favourite_applications",
+          "label": "Favourite applications",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "favourite_food",
+          "label": "Favourite food",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "favourite_restaurants",
+          "label": "Favourite restaurants",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "favourite_clothing_brands",
+          "label": "Favourite clothing brands",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "favourite_colours",
+          "label": "Favourite colours",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "preferred_aesthetics",
+          "label": "Preferred aesthetics",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "favourite_travel_destinations",
+          "label": "Favourite travel destinations",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "disliked_entertainment",
+          "label": "Disliked entertainment",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "content_recommendations",
+          "label": "Content recommendations",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "subscription_preferences",
+          "label": "Subscription preferences",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        }
+      ],
+      "meaning": "What they enjoy",
+      "default_level": "L1",
+      "ai_may_infer": true
+    },
+    {
+      "id": 19,
+      "title": "Beliefs & values",
+      "intro": "",
+      "notes": [],
+      "fields": [
+        {
+          "key": "personal_values",
+          "label": "Personal values",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "honesty",
+          "label": "Honesty",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "loyalty",
+          "label": "Loyalty",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "freedom",
+          "label": "Freedom",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "responsibility",
+          "label": "Responsibility",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "ambition",
+          "label": "Ambition",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "compassion",
+          "label": "Compassion",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "justice",
+          "label": "Justice",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "family_importance",
+          "label": "Family importance",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "individualism",
+          "label": "Individualism",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "cooperation",
+          "label": "Cooperation",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "work_ethic",
+          "label": "Work ethic",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "definition_of_success",
+          "label": "Definition of success",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "definition_of_happiness",
+          "label": "Definition of happiness",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "personal_ethics",
+          "label": "Personal ethics",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "moral_boundaries",
+          "label": "Moral boundaries",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "opinions_on_important_subjects",
+          "label": "Opinions on important subjects",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "principles_they_refuse_to_compromise",
+          "label": "Principles they refuse to compromise",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "causes_they_support",
+          "label": "Causes they support",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        }
+      ],
+      "meaning": "What they stand for",
+      "default_level": "L2",
+      "ai_may_infer": true
+    },
+    {
+      "id": 20,
+      "title": "Religion & spirituality",
+      "intro": "",
+      "notes": [
+        "Never infer someone's religion from their name, country, family, or language."
+      ],
+      "fields": [
+        {
+          "key": "religious_affiliation",
+          "label": "Religious affiliation (optional)",
+          "optional": true,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "spiritual_beliefs",
+          "label": "Spiritual beliefs (optional)",
+          "optional": true,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "religious_practices",
+          "label": "Religious practices",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "prayer_preferences",
+          "label": "Prayer preferences",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "meditation_practices",
+          "label": "Meditation practices",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "festivals",
+          "label": "Festivals",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "sacred_texts",
+          "label": "Sacred texts",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "philosophical_traditions",
+          "label": "Philosophical traditions",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "personal_understanding_of_purpose",
+          "label": "Personal understanding of purpose",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "spiritual_goals",
+          "label": "Spiritual goals",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "religious_dietary_practices",
+          "label": "Religious dietary practices",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "religious_boundaries",
+          "label": "Religious boundaries",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "questions_about_existence",
+          "label": "Questions about existence",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "preferred_treatment_of_religious_topics",
+          "label": "Preferred treatment of religious topics",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        }
+      ],
+      "meaning": "How they relate to meaning and faith",
+      "default_level": "L3",
+      "ai_may_infer": false
+    },
+    {
+      "id": 21,
+      "title": "Goals & ambitions",
+      "intro": "",
+      "notes": [],
+      "fields": [
+        {
+          "key": "short_term_goals",
+          "label": "Short-term goals",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "medium_term_goals",
+          "label": "Medium-term goals",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "long_term_goals",
+          "label": "Long-term goals",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "personal_goals",
+          "label": "Personal goals",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "educational_goals_g21",
+          "label": "Educational goals",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "career_goals",
+          "label": "Career goals",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "financial_goals_g21",
+          "label": "Financial goals",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "health_goals_g21",
+          "label": "Health goals",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "family_goals",
+          "label": "Family goals",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "relationship_goals",
+          "label": "Relationship goals",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "travel_goals",
+          "label": "Travel goals",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "business_goals",
+          "label": "Business goals",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "creative_goals",
+          "label": "Creative goals",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "social_contribution_goals",
+          "label": "Social contribution goals",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "retirement_goals",
+          "label": "Retirement goals",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "target_dates",
+          "label": "Target dates",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "date"
+        },
+        {
+          "key": "success_measurements",
+          "label": "Success measurements",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "required_resources",
+          "label": "Required resources",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "obstacles",
+          "label": "Obstacles",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "progress",
+          "label": "Progress",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "percent"
+        },
+        {
+          "key": "motivation",
+          "label": "Motivation",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "priority_ranking",
+          "label": "Priority ranking",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "abandoned_goals",
+          "label": "Abandoned goals",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "completed_goals",
+          "label": "Completed goals",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        }
+      ],
+      "meaning": "Where they want to go",
+      "default_level": "L2",
+      "ai_may_infer": true
+    },
+    {
+      "id": 22,
+      "title": "Dreams & imagination",
+      "intro": "",
+      "notes": [],
+      "fields": [
+        {
+          "key": "childhood_dreams_g22",
+          "label": "Childhood dreams",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "future_lifestyle_vision",
+          "label": "Future lifestyle vision",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "ideal_home",
+          "label": "Ideal home",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "ideal_career",
+          "label": "Ideal career",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "dream_business",
+          "label": "Dream business",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "dream_destinations",
+          "label": "Dream destinations",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "creative_concepts",
+          "label": "Creative concepts",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "inventions_they_imagine",
+          "label": "Inventions they imagine",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "personal_aspirations",
+          "label": "Personal aspirations",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "ideal_daily_routine",
+          "label": "Ideal daily routine",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "things_they_want_to_experience",
+          "label": "Things they want to experience",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "legacy_they_want_to_leave",
+          "label": "Legacy they want to leave",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "their_vision_of_the_future",
+          "label": "Their vision of the future",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "impossible_sounding_ideas_worth_exploring",
+          "label": "Impossible-sounding ideas worth exploring",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        }
+      ],
+      "meaning": "What they envision",
+      "default_level": "L1",
+      "ai_may_infer": true
+    },
+    {
+      "id": 23,
+      "title": "Fears & vulnerabilities",
+      "intro": "This is an especially sensitive category. It must never become a mechanism for manipulation.",
+      "notes": [],
+      "fields": [
+        {
+          "key": "common_worries",
+          "label": "Common worries",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "uncertainty_triggers",
+          "label": "Uncertainty triggers",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "situations_they_avoid",
+          "label": "Situations they avoid",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "personal_insecurities",
+          "label": "Personal insecurities",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "fear_of_failure",
+          "label": "Fear of failure",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "fear_of_rejection",
+          "label": "Fear of rejection",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "fear_of_loss",
+          "label": "Fear of loss",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "fear_of_public_speaking",
+          "label": "Fear of public speaking",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "fear_of_financial_instability",
+          "label": "Fear of financial instability",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "situations_where_they_feel_unsafe",
+          "label": "Situations where they feel unsafe",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "personal_boundaries",
+          "label": "Personal boundaries",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "topics_they_do_not_want_discussed",
+          "label": "Topics they do not want discussed",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "preferred_reassurance",
+          "label": "Preferred reassurance",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "support_needed_during_difficult_periods",
+          "label": "Support needed during difficult periods",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        }
+      ],
+      "meaning": "What makes them feel unsafe",
+      "default_level": "L3",
+      "ai_may_infer": false
+    },
+    {
+      "id": 24,
+      "title": "Motivation & discipline",
+      "intro": "",
+      "notes": [],
+      "fields": [
+        {
+          "key": "what_motivates_them",
+          "label": "What motivates them",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "what_discourages_them",
+          "label": "What discourages them",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "personal_incentives",
+          "label": "Personal incentives",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "sources_of_inspiration",
+          "label": "Sources of inspiration",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "accountability_preferences",
+          "label": "Accountability preferences",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "procrastination_patterns",
+          "label": "Procrastination patterns",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "habit_building_preferences",
+          "label": "Habit-building preferences",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "discipline_strategies",
+          "label": "Discipline strategies",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "reward_preferences",
+          "label": "Reward preferences",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "productivity_triggers",
+          "label": "Productivity triggers",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "focus_techniques",
+          "label": "Focus techniques",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "goal_tracking_preferences",
+          "label": "Goal-tracking preferences",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "reasons_for_giving_up",
+          "label": "Reasons for giving up",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "strategies_that_help_them_restart",
+          "label": "Strategies that help them restart",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "preferred_encouragement_style",
+          "label": "Preferred encouragement style",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        }
+      ],
+      "meaning": "What drives their actions",
+      "default_level": "L2",
+      "ai_may_infer": true
+    },
+    {
+      "id": 25,
+      "title": "Decision-making patterns",
+      "intro": "",
+      "notes": [],
+      "fields": [
+        {
+          "key": "risk_tolerance_g25",
+          "label": "Risk tolerance",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "decision_speed",
+          "label": "Decision speed",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "research_requirements",
+          "label": "Research requirements",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "trusted_information_sources",
+          "label": "Trusted information sources",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "analytical_versus_intuitive_approach",
+          "label": "Analytical versus intuitive approach",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "financial_decision_preferences",
+          "label": "Financial decision preferences",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "career_decision_preferences",
+          "label": "Career decision preferences",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "conflict_resolution_approach",
+          "label": "Conflict-resolution approach",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "long_term_versus_short_term_orientation",
+          "label": "Long-term versus short-term orientation",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "need_for_external_advice",
+          "label": "Need for external advice",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "preferred_comparison_formats",
+          "label": "Preferred comparison formats",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "reaction_to_uncertainty",
+          "label": "Reaction to uncertainty",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "decision_making_mistakes",
+          "label": "Decision-making mistakes",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "lessons_from_previous_decisions",
+          "label": "Lessons from previous decisions",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "personal_decision_principles",
+          "label": "Personal decision principles",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        }
+      ],
+      "meaning": "How they choose",
+      "default_level": "L2",
+      "ai_may_infer": true
+    },
+    {
+      "id": 26,
+      "title": "Social & environmental context",
+      "intro": "",
+      "notes": [],
+      "fields": [
+        {
+          "key": "current_country_g26",
+          "label": "Current country",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "city_or_region",
+          "label": "City or region",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "climate_preferences",
+          "label": "Climate preferences",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "living_environment",
+          "label": "Living environment",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "housing_situation",
+          "label": "Housing situation",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "transportation_access",
+          "label": "Transportation access",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "internet_access",
+          "label": "Internet access",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "local_infrastructure",
+          "label": "Local infrastructure",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "community_environment",
+          "label": "Community environment",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "accessibility_needs",
+          "label": "Accessibility needs",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "local_laws_affecting_their_activities",
+          "label": "Local laws affecting their activities",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "cost_of_living",
+          "label": "Cost of living",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "environmental_preferences",
+          "label": "Environmental preferences",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "neighbourhood_amenities",
+          "label": "Neighbourhood amenities",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "travel_constraints",
+          "label": "Travel constraints",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "social_support_availability",
+          "label": "Social support availability",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        }
+      ],
+      "meaning": "The world around them",
+      "default_level": "L2",
+      "ai_may_infer": true
+    },
+    {
+      "id": 27,
+      "title": "Digital identity & technology",
+      "intro": "",
+      "notes": [
+        "Never store passwords, private keys, recovery codes, or authentication secrets in the human profile."
+      ],
+      "fields": [
+        {
+          "key": "email_accounts",
+          "label": "Email accounts",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "digital_platforms",
+          "label": "Digital platforms",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "social_media_profiles",
+          "label": "Social media profiles",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "websites",
+          "label": "Websites",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "digital_subscriptions",
+          "label": "Digital subscriptions",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "devices_owned",
+          "label": "Devices owned",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "operating_systems",
+          "label": "Operating systems",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "software_preferences",
+          "label": "Software preferences",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "cloud_storage_preferences",
+          "label": "Cloud storage preferences",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "digital_skills",
+          "label": "Digital skills",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "ai_tools_used",
+          "label": "AI tools used",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "online_learning_platforms",
+          "label": "Online learning platforms",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "digital_projects",
+          "label": "Digital projects",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "online_communities",
+          "label": "Online communities",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "privacy_preferences",
+          "label": "Privacy preferences",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "security_preferences",
+          "label": "Security preferences",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "authentication_preferences",
+          "label": "Authentication preferences",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "data_sharing_permissions",
+          "label": "Data-sharing permissions",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "digital_legacy_preferences",
+          "label": "Digital legacy preferences",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        }
+      ],
+      "meaning": "How they exist online",
+      "default_level": "L2",
+      "ai_may_infer": true
+    },
+    {
+      "id": 28,
+      "title": "Responsibilities & obligations",
+      "intro": "",
+      "notes": [],
+      "fields": [
+        {
+          "key": "dependants",
+          "label": "Dependants",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "person_list"
+        },
+        {
+          "key": "family_responsibilities_g28",
+          "label": "Family responsibilities",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "work_responsibilities",
+          "label": "Work responsibilities",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "business_commitments",
+          "label": "Business commitments",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "financial_obligations",
+          "label": "Financial obligations",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "education_responsibilities",
+          "label": "Education responsibilities",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "household_responsibilities_g28",
+          "label": "Household responsibilities",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "appointments",
+          "label": "Appointments",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "deadlines",
+          "label": "Deadlines",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "contracts",
+          "label": "Contracts",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "legal_commitments",
+          "label": "Legal commitments",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "important_renewals",
+          "label": "Important renewals",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "promises_made",
+          "label": "Promises made",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "volunteering_commitments",
+          "label": "Volunteering commitments",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "people_relying_on_them",
+          "label": "People relying on them",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "person_list"
+        },
+        {
+          "key": "upcoming_obligations",
+          "label": "Upcoming obligations",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        }
+      ],
+      "meaning": "What depends on them",
+      "default_level": "L2",
+      "ai_may_infer": true
+    },
+    {
+      "id": 29,
+      "title": "Experiences & memories",
+      "intro": "",
+      "notes": [],
+      "fields": [
+        {
+          "key": "important_conversations",
+          "label": "Important conversations",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "life_events",
+          "label": "Life events",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "travel_experiences",
+          "label": "Travel experiences",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "achievements",
+          "label": "Achievements",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "lessons_learned",
+          "label": "Lessons learned",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "personal_reflections",
+          "label": "Personal reflections",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "significant_failures",
+          "label": "Significant failures",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "favourite_moments",
+          "label": "Favourite moments",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "important_relationships",
+          "label": "Important relationships",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "projects_completed",
+          "label": "Projects completed",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "projects_abandoned",
+          "label": "Projects abandoned",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "personal_stories",
+          "label": "Personal stories",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "meaningful_gifts",
+          "label": "Meaningful gifts",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "important_promises",
+          "label": "Important promises",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "things_they_want_remembered",
+          "label": "Things they want remembered",
+          "optional": false,
+          "level": "L2",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "things_they_want_forgotten",
+          "label": "Things they want forgotten",
+          "optional": false,
+          "level": "L3",
+          "never_store": false,
+          "ai_may_infer": false,
+          "data_type": "text"
+        },
+        {
+          "key": "memories_that_should_never_be_shared",
+          "label": "Memories that should never be shared",
+          "optional": false,
+          "level": "L4",
+          "never_store": true,
+          "ai_may_infer": false,
+          "data_type": "text"
+        }
+      ],
+      "meaning": "What they have lived through",
+      "default_level": "L2",
+      "ai_may_infer": true
+    },
+    {
+      "id": 30,
+      "title": "AI partnership preferences",
+      "intro": "This is the layer that transforms a database into an actual AI companion.",
+      "notes": [],
+      "fields": [
+        {
+          "key": "what_should_ai_call_the_person",
+          "label": "What should AI call the person?",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "what_role_should_ai_play",
+          "label": "What role should AI play?",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "assistant_tutor_mentor_researcher_coach_companion_or_collaborator",
+          "label": "Assistant, tutor, mentor, researcher, coach, companion, or collaborator?",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "should_ai_challenge_their_assumptions",
+          "label": "Should AI challenge their assumptions?",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "should_ai_disagree_when_necessary",
+          "label": "Should AI disagree when necessary?",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "how_direct_should_ai_be",
+          "label": "How direct should AI be?",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "should_ai_proactively_suggest_improvements",
+          "label": "Should AI proactively suggest improvements?",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "should_ai_remind_them_about_commitments",
+          "label": "Should AI remind them about commitments?",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "should_ai_track_their_goals",
+          "label": "Should AI track their goals?",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "should_ai_monitor_progress",
+          "label": "Should AI monitor progress?",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "should_ai_explain_its_reasoning",
+          "label": "Should AI explain its reasoning?",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "should_ai_verify_important_facts",
+          "label": "Should AI verify important facts?",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "should_ai_ask_before_taking_action",
+          "label": "Should AI ask before taking action?",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "what_decisions_must_remain_exclusively_human",
+          "label": "What decisions must remain exclusively human?",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "what_topics_require_extra_sensitivity",
+          "label": "What topics require extra sensitivity?",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "what_information_must_remain_private",
+          "label": "What information must remain private?",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "what_should_ai_never_assume",
+          "label": "What should AI never assume?",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "what_should_ai_never_do",
+          "label": "What should AI never do?",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "how_should_ai_respond_when_the_person_is_upset",
+          "label": "How should AI respond when the person is upset?",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "how_should_ai_respond_when_the_person_is_making_a_poor_decision",
+          "label": "How should AI respond when the person is making a poor decision?",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        },
+        {
+          "key": "what_does_being_a_good_partner_mean_to_them",
+          "label": "What does being a good partner mean to them?",
+          "optional": false,
+          "level": "L1",
+          "never_store": false,
+          "ai_may_infer": true,
+          "data_type": "text"
+        }
+      ],
+      "meaning": "How AI should support them",
+      "default_level": "L1",
+      "ai_may_infer": true
+    }
+  ],
+  "life_stages": [
+    {
+      "stage": 1,
+      "title": "Childhood",
+      "min_age": 8,
+      "max_age": 12,
+      "theme": "Learning and protection",
+      "focus": [
+        "Favourite subjects, games and activities",
+        "Learning abilities and school progress",
+        "Friendships and family relationships",
+        "Confidence and emotional expression",
+        "Interests and imagination",
+        "Safety, boundaries and trusted adults",
+        "Age-appropriate goals and habits"
+      ]
+    },
+    {
+      "stage": 2,
+      "title": "Adolescence",
+      "min_age": 13,
+      "max_age": 17,
+      "theme": "Identity and independence",
+      "focus": [
+        "Personal identity development",
+        "Academic interests",
+        "Friendships and social pressures",
+        "Emerging talents",
+        "Emotional development",
+        "Digital safety",
+        "Career exploration",
+        "Personal boundaries",
+        "Independent thinking"
+      ]
+    },
+    {
+      "stage": 3,
+      "title": "Emerging adulthood",
+      "min_age": 18,
+      "max_age": 24,
+      "theme": "Discovery and independence",
+      "focus": [
+        "Higher education",
+        "Career exploration",
+        "Financial independence",
+        "Living arrangements",
+        "Relationships",
+        "Social identity",
+        "Personal values",
+        "Skill development",
+        "Life experiments",
+        "Future ambitions"
+      ]
+    },
+    {
+      "stage": 4,
+      "title": "Early adulthood",
+      "min_age": 25,
+      "max_age": 34,
+      "theme": "Building foundations",
+      "focus": [
+        "Career development",
+        "Business opportunities",
+        "Financial planning",
+        "Long-term relationships",
+        "Family planning, if relevant",
+        "Housing and assets",
+        "Professional reputation",
+        "Personal growth",
+        "Lifestyle design"
+      ]
+    },
+    {
+      "stage": 5,
+      "title": "Mid-adulthood",
+      "min_age": 35,
+      "max_age": 49,
+      "theme": "Expansion and responsibility",
+      "focus": [
+        "Career leadership",
+        "Business ownership",
+        "Wealth accumulation",
+        "Parenting responsibilities",
+        "Family wellbeing",
+        "Health maintenance",
+        "Long-term investments",
+        "Mentoring",
+        "Work-life balance"
+      ]
+    },
+    {
+      "stage": 6,
+      "title": "Mature adulthood",
+      "min_age": 50,
+      "max_age": 64,
+      "theme": "Preservation and transition",
+      "focus": [
+        "Career transition",
+        "Financial security",
+        "Retirement planning",
+        "Health and mobility",
+        "Family responsibilities",
+        "Knowledge transfer",
+        "Legacy projects",
+        "Personal fulfilment",
+        "New interests"
+      ]
+    },
+    {
+      "stage": 7,
+      "title": "Senior adulthood",
+      "min_age": 65,
+      "max_age": 79,
+      "theme": "Wellbeing and meaningful living",
+      "focus": [
+        "Retirement lifestyle",
+        "Health management",
+        "Social connections",
+        "Family relationships",
+        "Hobbies",
+        "Financial management",
+        "Accessibility",
+        "Life experiences",
+        "Knowledge sharing"
+      ]
+    },
+    {
+      "stage": 8,
+      "title": "Advanced age",
+      "min_age": 80,
+      "max_age": null,
+      "theme": "Dignity, comfort and continuity",
+      "focus": [
+        "Personal independence",
+        "Mobility and accessibility",
+        "Healthcare coordination",
+        "Trusted relationships",
+        "Memory support, if desired",
+        "Communication assistance",
+        "Daily living support",
+        "Personal history preservation",
+        "End-of-life preferences, if they choose",
+        "Dignity and personal autonomy"
+      ],
+      "band_label": "80–100+"
+    }
+  ]
+}

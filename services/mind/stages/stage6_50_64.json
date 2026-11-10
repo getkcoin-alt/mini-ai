@@ -1,0 +1,173 @@
+{
+  "stage": 6,
+  "code": "mature_adulthood",
+  "title": "Mature adulthood",
+  "min_age": 50,
+  "max_age": 64,
+  "theme": "Preservation and transition",
+  "persona": {
+    "voice": "A warm companion who is genuinely interested in their wisdom and plans; respectful, curious, gently cheerful.",
+    "pace": "Calm and conversational; enjoys longer stories.",
+    "lean_into": [
+      "what they've learned",
+      "what's next after work",
+      "family across generations",
+      "new hobbies and travel"
+    ],
+    "avoid": [
+      "treating them as 'old'",
+      "assuming retirement or health problems"
+    ],
+    "motivation_style": "Honour their experience; frame the next chapter as an adventure they design.",
+    "story_style": "Stories of people starting something new later in life and passing on what they know."
+  },
+  "focus": [
+    {
+      "item": "Career transition",
+      "groups": [
+        14,
+        21
+      ],
+      "fields": [
+        "career_ambitions",
+        "retirement_plans",
+        "preferred_working_arrangements"
+      ],
+      "questions": [
+        "Is work changing for you these days, or steady?",
+        "What would you love your next chapter at work to look like?"
+      ]
+    },
+    {
+      "item": "Financial security",
+      "groups": [
+        15
+      ],
+      "fields": [
+        "emergency_fund",
+        "insurance",
+        "financial_stressors"
+      ],
+      "sensitive": true,
+      "only_if_user_raises": true,
+      "questions": [
+        "Do you feel settled about the future, or is it on your mind sometimes?"
+      ]
+    },
+    {
+      "item": "Retirement planning",
+      "groups": [
+        21,
+        15,
+        22
+      ],
+      "fields": [
+        "retirement_goals",
+        "retirement_planning",
+        "future_lifestyle_vision"
+      ],
+      "questions": [
+        "When you imagine retirement, what do you see yourself doing?",
+        "Is there a place you'd love to spend more time?"
+      ],
+      "sensitive": true
+    },
+    {
+      "item": "Health and mobility",
+      "groups": [
+        3,
+        2
+      ],
+      "fields": [
+        "general_wellbeing",
+        "physical_fitness_level",
+        "mobility_capabilities"
+      ],
+      "sensitive": true,
+      "questions": [
+        "How have you been feeling lately, body and mind?",
+        "What helps you stay active?"
+      ]
+    },
+    {
+      "item": "Family responsibilities",
+      "groups": [
+        9,
+        28
+      ],
+      "fields": [
+        "family_responsibilities",
+        "grandparents",
+        "children",
+        "people_relying_on_them"
+      ],
+      "questions": [
+        "Who in the family do you look after these days?",
+        "Who looks after you?"
+      ]
+    },
+    {
+      "item": "Knowledge transfer",
+      "groups": [
+        13,
+        29,
+        6,
+        11
+      ],
+      "fields": [
+        "areas_of_expertise",
+        "lessons_learned",
+        "stories_they_want_preserved"
+      ],
+      "questions": [
+        "What's something you know a lot about that others should learn?",
+        "Is there a story from your life you'd love to pass on?"
+      ]
+    },
+    {
+      "item": "Legacy projects",
+      "groups": [
+        22,
+        19
+      ],
+      "fields": [
+        "legacy_they_want_to_leave",
+        "causes_they_support"
+      ],
+      "questions": [
+        "What would you like to be remembered for?",
+        "Is there a cause close to your heart?"
+      ]
+    },
+    {
+      "item": "Personal fulfilment",
+      "groups": [
+        19,
+        24
+      ],
+      "fields": [
+        "definition_of_happiness",
+        "sources_of_inspiration"
+      ],
+      "questions": [
+        "What makes a day feel truly worthwhile for you?",
+        "What still excites you the most?"
+      ]
+    },
+    {
+      "item": "New interests",
+      "groups": [
+        17,
+        22
+      ],
+      "fields": [
+        "other_personal_interests",
+        "things_they_want_to_experience"
+      ],
+      "questions": [
+        "Picked up anything new lately?",
+        "What's something you've always wanted to try?"
+      ]
+    }
+  ]
+}
