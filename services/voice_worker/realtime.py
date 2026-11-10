@@ -26,7 +26,7 @@ import numpy as np
 import torch
 from fastapi import WebSocket, WebSocketDisconnect
 
-from . import admission, engine, memory, mind, resource_limits, ws_auth
+from . import acks, admission, engine, memory, mind, resource_limits, ws_auth
 
 logger = logging.getLogger("mini.realtime")
 
@@ -90,6 +90,26 @@ def _private(text: str) -> str:
 
 
 FIRST_CLAUSE_MIN_CHARS = 12
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.environ.get(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
+# Quick wins (2026-11-10): short spoken replies and a calmer end-of-turn.
+REPLY_TOKENS = _env_int("MINI_REPLY_TOKENS", 60)          # Ollama num_predict
+REPLY_MAX_SENTENCES = _env_int("MINI_REPLY_MAX_SENTENCES", 3)
+REPLY_MAX_CHARS = _env_int("MINI_REPLY_MAX_CHARS", 160)
+VAD_SILENCE_MS = _env_int("MINI_VAD_SILENCE_MS", 800)
+
+
+def reply_is_complete(spoken: list[str]) -> bool:
+    """True once the clauses already queued make a full short reply."""
+    sentences = sum(1 for c in spoken if c.rstrip().endswith((".", "!", "?")))
+    return sentences >= REPLY_MAX_SENTENCES or sum(len(c) + 1 for c in spoken) >= REPLY_MAX_CHARS
 FIRST_CLAUSE_MAX_WORDS = 7
 
 
@@ -148,6 +168,30 @@ async def fetch_user_context(access_token: str, user_id: str) -> list[str]:
 _LEARNING_TASKS: set = set()
 
 
+def live_whisper():
+    """The live speech-recognition model (created once). Caller holds STT_LOCK."""
+    model = engine._WHISPER
+    if model is None:
+        from faster_whisper import WhisperModel
+        hardware = "cuda" if torch.cuda.is_available() else "cpu"
+        model = WhisperModel(
+            os.environ.get("MINI_WHISPER_MODEL", "tiny.en"),
+            device=hardware,
+            compute_type="float16" if hardware == "cuda" else "int8",
+            cpu_threads=int(os.environ.get("MINI_CPU_THREADS", "6")),
+            num_workers=1,
+        )
+        engine._WHISPER = model
+    return model
+
+
+def warm_stt() -> None:
+    """Load and run speech recognition once so the first turn is not slow."""
+    with engine.STT_LOCK:
+        segments, _ = live_whisper().transcribe(np.zeros(16000, dtype=np.float32), beam_size=1, vad_filter=False)
+        list(segments)
+
+
 class SileroVADDetector:
     def __init__(self, model):
         self.model = model
@@ -157,7 +201,7 @@ class SileroVADDetector:
         self.silence_frames = 0
         self.speech_threshold = 0.5
         self.min_speech_frames = 3    # 60ms to trigger speech_started
-        self.min_silence_frames = 25  # 500ms to trigger speech_ended
+        self.min_silence_frames = max(10, VAD_SILENCE_MS // 20)  # 20 ms frames; default 800 ms
         self.utterance_samples = []
 
     def feed(self, pcm_bytes: bytes) -> tuple[str | None, float]:
@@ -483,22 +527,8 @@ class MiniRealtimeSession:
         loop = asyncio.get_running_loop()
 
         def _do_stt():
-            with engine.MODEL_LOCK:
-                model = engine._WHISPER
-                if model is None:
-                    # Initialize whisper model
-                    from faster_whisper import WhisperModel
-                    hardware = "cuda" if torch.cuda.is_available() else "cpu"
-                    model = WhisperModel(
-                        os.environ.get("MINI_WHISPER_MODEL", "tiny.en"),
-                        device=hardware,
-                        compute_type="float16" if hardware == "cuda" else "int8",
-                        cpu_threads=int(os.environ.get("MINI_CPU_THREADS", "6")),
-                        num_workers=1,
-                    )
-                    engine._WHISPER = model
-
-                segments, _ = model.transcribe(audio_samples, beam_size=1, vad_filter=False)
+            with engine.STT_LOCK:
+                segments, _ = live_whisper().transcribe(audio_samples, beam_size=1, vad_filter=False)
                 return " ".join(seg.text.strip() for seg in segments).strip()
 
         transcript = await loop.run_in_executor(None, _do_stt)
@@ -600,12 +630,19 @@ class MiniRealtimeSession:
         self.current_stream_id += 1
         stream_id = self.current_stream_id
         clauses: asyncio.Queue = asyncio.Queue()
-        timing = {"llm_first_token_ms": None, "first_audio_ms": None}
+        timing = {"ack_ms": None, "llm_first_token_ms": None, "first_audio_ms": None}
         speaker = asyncio.create_task(self._speak_clauses(response_id, stream_id, clauses, timing, t_start))
 
         full_reply: list[str] = []
         buffer = ""
         clauses_sent = 0
+        spoken: list[str] = []
+        capped = False
+        if not opening:
+            ack = acks.pick(user_transcript)
+            if ack:
+                # A tiny "Mm-hmm"/"Oh nice!" in Mini's voice while the reply is made.
+                clauses.put_nowait(ack[1])
         try:
             async with httpx.AsyncClient(timeout=60.0, trust_env=False) as client:
                 async with client.stream("POST", f"{ollama_url}/api/chat", json={
@@ -613,7 +650,7 @@ class MiniRealtimeSession:
                     "messages": messages,
                     "stream": True,
                     "keep_alive": engine.ollama_keep_alive(),
-                    "options": {"num_predict": 100, "temperature": 0.6, "num_ctx": 2048,
+                    "options": {"num_predict": REPLY_TOKENS, "temperature": 0.6, "num_ctx": 2048,
                                 "num_thread": engine.llm_threads()},
                 }) as stream_resp:
                     async for line in stream_resp.aiter_lines():
@@ -631,15 +668,26 @@ class MiniRealtimeSession:
                                 timing["llm_first_token_ms"] = round((time.perf_counter() - t_start) * 1000)
                             full_reply.append(delta)
                             buffer += delta
-                            await self.send_json({"type": "response.text.delta", "response_id": response_id, "text": delta})
                             cut = split_clause(buffer, first=clauses_sent == 0)
                             if cut:
                                 clause, buffer = cut
+                                # On-screen text follows what Mini actually says (never cut-off words).
+                                await self.send_json({"type": "response.text.delta", "response_id": response_id,
+                                                      "text": (" " if clauses_sent else "") + clause})
                                 clauses.put_nowait(clause)
                                 clauses_sent += 1
+                                spoken.append(clause)
+                                if reply_is_complete(spoken):
+                                    # Hard cap: stop the model; closing the stream ends generation.
+                                    capped = True
+                                    break
                         if chunk_json.get("done", False):
                             break
-            if buffer.strip() and response_id not in self.cancelled_response_ids:
+            if capped:
+                full_reply = [" ".join(spoken)]
+            elif buffer.strip() and response_id not in self.cancelled_response_ids:
+                await self.send_json({"type": "response.text.delta", "response_id": response_id,
+                                      "text": (" " if clauses_sent else "") + buffer.strip()})
                 clauses.put_nowait(buffer.strip())
             extra = engine.crisis_followup(user_transcript, "".join(full_reply))
             if extra and response_id not in self.cancelled_response_ids:
@@ -663,8 +711,8 @@ class MiniRealtimeSession:
             total_ms = round((time.perf_counter() - t_start) * 1000)
             await self.send_json({"type": "pipeline.timing", "response_id": response_id, **timing, "total_ms": total_ms})
             await self.send_json({"type": "response.finished", "response_id": response_id})
-            logger.info("Response %s: llm_first=%sms first_audio=%sms total=%sms %s", response_id,
-                        timing["llm_first_token_ms"], timing["first_audio_ms"], total_ms, _private(complete_text))
+            logger.info("Response %s: ack=%sms llm_first=%sms first_audio=%sms total=%sms %s", response_id,
+                        timing["ack_ms"], timing["llm_first_token_ms"], timing["first_audio_ms"], total_ms, _private(complete_text))
 
     async def _speak_clauses(self, response_id: str, stream_id: int, clauses: asyncio.Queue,
                              timing: dict, t_start: float):
@@ -674,6 +722,17 @@ class MiniRealtimeSession:
             clause = await clauses.get()
             if clause is None or response_id in self.cancelled_response_ids:
                 break
+            if isinstance(clause, bytes):
+                # Ready-made acknowledgement PCM (already silence-padded).
+                if not started:
+                    started = True
+                    timing["ack_ms"] = round((time.perf_counter() - t_start) * 1000)
+                    await self.send_json({"type": "response.audio.start", "response_id": response_id, "stream_id": stream_id})
+                for offset in range(0, len(clause), MAX_OUTPUT_CHUNK_BYTES):
+                    if response_id in self.cancelled_response_ids:
+                        return
+                    await self.send_audio_chunk(stream_id, clause[offset:offset + MAX_OUTPUT_CHUNK_BYTES])
+                continue
             t_clause = time.perf_counter()
             audio_s = 0.0
             async for samples in self._clause_audio(clause[:300], response_id):
@@ -681,10 +740,11 @@ class MiniRealtimeSession:
                     return
                 audio_s += len(samples) / OUTPUT_RATE
                 pcm_bytes = (np.clip(samples, -1.0, 1.0) * 32767).astype("<i2").tobytes()
-                if not started:
-                    started = True
+                if timing["first_audio_ms"] is None:
                     self.reply_audio_started = True
                     timing["first_audio_ms"] = round((time.perf_counter() - t_start) * 1000)
+                if not started:
+                    started = True
                     await self.send_json({"type": "response.audio.start", "response_id": response_id, "stream_id": stream_id})
                 for offset in range(0, len(pcm_bytes), MAX_OUTPUT_CHUNK_BYTES):
                     if response_id in self.cancelled_response_ids:
