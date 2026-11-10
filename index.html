@@ -77,6 +77,7 @@
         </div>
         <div class="ob-body">
           <div class="orb orb-small" aria-hidden="true"><span class="eye"></span><span class="eye"></span><span class="mouth"></span></div>
+          <p class="cheer hidden" id="ob-cheer" role="status" aria-live="polite"></p>
           <h2 id="ob-question">What should I call you?</h2>
           <p class="hint" id="ob-help"></p>
           <div id="ob-input" class="ob-input"></div>
@@ -85,6 +86,26 @@
           <button class="btn btn-text" id="ob-skip" type="button">Skip</button>
           <button class="btn btn-primary" id="ob-next" type="button">Next</button>
         </div>
+      </div>
+    </section>
+
+    <!-- Meet Mini: what Mini is, once it knows you -->
+    <section class="screen" id="s-meet" aria-labelledby="meet-title">
+      <div class="page-pad meet">
+        <button class="icon-btn back" id="meet-back" type="button" aria-label="Back to my answers">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+        </button>
+        <div class="orb orb-hero breathing" aria-hidden="true"><span class="eye"></span><span class="eye"></span><span class="mouth"></span></div>
+        <h1 id="meet-title" class="meet-title">Hi, I'm Mini.</h1>
+        <div class="meet-lines" id="meet-lines"></div>
+        <ul class="meet-promise" id="meet-promise"></ul>
+        <div class="meet-consents">
+          <label class="consent"><input type="checkbox" id="ob-consent"><span>Remember my answers so Mini can get to know me. I can change or delete them anytime.</span></label>
+          <label class="consent"><input type="checkbox" id="ob-learn" checked><span>Let Mini learn from our talks — my day, my people, my goals. I review everything in Memories.</span></label>
+          <label class="consent"><input type="checkbox" id="ob-terms"><span>I agree to the <a href="/terms.html" target="_blank">Terms</a> and <a href="/privacy.html" target="_blank">Privacy Policy</a>.</span></label>
+        </div>
+        <button class="btn btn-primary meet-go" id="meet-go" type="button">Let's begin ✨</button>
+        <p class="fine center">Your space is ready — your Talk, Memories and how well Mini knows you.</p>
       </div>
     </section>
 
@@ -107,7 +128,6 @@
         </div>
         <div class="top-chips">
           <span class="chip sync hidden" id="sync-chip" title="How well Mini knows you so far">Mini knows you 0%</span>
-          <button class="chip" id="mode-chip" type="button" aria-label="Switch between Friend and Mentor">♡ Friend</button>
         </div>
       </header>
 
@@ -163,13 +183,6 @@
             <form id="you-form" class="stack">
               <label class="field"><span>What Mini calls you</span><input id="you-name" maxlength="80" autocomplete="nickname"></label>
               <label class="field"><span>Your companion's name</span><input id="you-mini" maxlength="80" placeholder="Mini"></label>
-              <fieldset class="field"><legend>Mini should be your</legend>
-                <div class="seg" id="you-rel">
-                  <label><input type="radio" name="rel" value="friend"><span>Friend</span></label>
-                  <label><input type="radio" name="rel" value="mentor"><span>Mentor</span></label>
-                  <label><input type="radio" name="rel" value="both"><span>Both</span></label>
-                </div>
-              </fieldset>
               <fieldset class="field"><legend>Talk to me in a way that's</legend>
                 <div class="seg" id="you-tone">
                   <label><input type="radio" name="tone" value="gentle"><span>Gentle</span></label>

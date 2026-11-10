@@ -54,3 +54,20 @@ test('legal pages exist and the crisis line is shown in settings', () => {
   assert.match(read('public/terms.html'), /Terms/);
   assert.match(read('index.html'), /href="tel:14416"/);
 });
+
+test('Mini is one entity: no friend/mentor choice anywhere in the app', () => {
+  const app = read('app.js'), html = read('index.html');
+  const steps = app.slice(app.indexOf('const STEPS = ['), app.indexOf('];', app.indexOf('const STEPS = [')));
+  assert.doesNotMatch(steps, /key: 'relationship'/);
+  assert.doesNotMatch(html, /id="mode-chip"|Mini should be your|name="rel"/);
+  assert.match(steps, /key: 'loves'/);
+});
+
+test('onboarding cheers after every answer and ends with Meet Mini + consents', () => {
+  const app = read('app.js'), html = read('index.html');
+  const steps = app.slice(app.indexOf('const STEPS = ['), app.indexOf('];', app.indexOf('const STEPS = [')));
+  assert.equal((steps.match(/cheer: \(d\)/g) || []).length, 5, 'every step after the first has a cheer');
+  assert.match(html, /id="s-meet"/);
+  for (const id of ['ob-consent', 'ob-learn', 'ob-terms', 'meet-go']) assert.match(html, new RegExp('id="' + id + '"'));
+  assert.match(app, /function showMeetMini\(\)/);
+});
