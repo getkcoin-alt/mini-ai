@@ -22,7 +22,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import engine, memory, resource_limits, ws_auth
+from . import acks, engine, memory, resource_limits, ws_auth
 
 logger = logging.getLogger("mini.voice")
 # uvicorn leaves the root logger at WARNING; keep Mini's own INFO lines
@@ -53,6 +53,13 @@ async def lifespan(_app: FastAPI):
             await asyncio.get_running_loop().run_in_executor(None, streaming_tts.ensure_t3_server)
         except Exception as exc:
             logger.warning("Speech-token process unavailable; streaming will start it on demand: %s", exc)
+    if os.environ.get("MINI_PRELOAD_TTS", "0") == "1" and acks.enabled():
+        try:
+            made = await asyncio.get_running_loop().run_in_executor(
+                None, acks.warm, lambda text: engine.synthesize_samples(text, "en"))
+            logger.info("Prepared %d acknowledgement clips in Mini's voice", made)
+        except Exception as exc:
+            logger.warning("Acknowledgement clips unavailable: %s", exc)
     if os.environ.get("MINI_PRELOAD_LLM", "1") == "1":
         # Load the Ollama model now so the first live turn is not a cold start.
         try:

@@ -74,7 +74,9 @@ export class MiniRealtimeSession {
     this.accessToken = token;
     this.setState('connecting');
     // Unlock output sound from an explicit user gesture before any response.
-    this.outputContext = new AudioContext({latencyHint:'interactive'});
+    // Play at Mini's native 24 kHz when the device allows it (no resampling).
+    try { this.outputContext = new AudioContext({latencyHint:'interactive',sampleRate:MINI_OUTPUT_RATE}); }
+    catch { this.outputContext = new AudioContext({latencyHint:'interactive'}); }
     await this.outputContext.audioWorklet.addModule('/mini-playback.worklet.js');
     this.outputNode = new AudioWorkletNode(this.outputContext,'mini-playback',{
       numberOfInputs:0,numberOfOutputs:1,outputChannelCount:[1],

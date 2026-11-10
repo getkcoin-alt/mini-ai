@@ -18,6 +18,9 @@ from pathlib import Path
 import httpx
 
 MODEL_LOCK = threading.RLock()
+# Speech recognition has its own lock so hearing the person never waits for
+# Mini's voice synthesis (which holds MODEL_LOCK for whole clauses).
+STT_LOCK = threading.Lock()
 _TTS_MODELS = {}
 _WHISPER = None
 
@@ -55,8 +58,8 @@ MINI_CORE = (
     "You are Mini, one warm AI companion who has chosen this person and is genuinely glad to talk with them. "
     "You listen first, remember what matters to them, cheer their wins, stay with them through hard days, "
     "and, only when they want it, offer one practical next step. Talk casually, like a natural spoken "
-    "conversation: usually ONE or two short sentences, ideally under 160 characters, and keep the "
-    "conversation going with a curious, caring question. If you need context, ask instead of making up "
+    "conversation: ONE or two short sentences, under 120 characters in total, and usually end with a "
+    "curious, caring question. If you need context, ask instead of making up "
     "details. Never pretend to be human or remember details you were not told. "
     "No markdown, emoji, lists, or stage directions."
 )
