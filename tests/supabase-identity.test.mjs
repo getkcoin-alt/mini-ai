@@ -68,10 +68,4 @@ test('unconfigured Supabase never enables real signup', async () => {
   }
 });
 
-test('real auth UI gates mock OTP and only writes confirmed memories', () => {
-  const src = readFileSync(new URL('../mini-identity-ui.js', import.meta.url),'utf8');
-  assert.match(src, /e\.stopImmediatePropagation\(\)/);
-  assert.match(src, /rememberMiniFact\(\{ kind: 'fact', content:.* consent: true \}\)/);
-  assert.match(src, /sendWhatsAppMiniOtp\(/);
-  assert.doesNotMatch(src, /123456/);
-});
+

@@ -67,3 +67,17 @@ class BrowserOriginTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PrivateLogTests(unittest.TestCase):
+    def test_transcripts_are_not_logged_by_default(self):
+        import ast
+        import pathlib
+        src = (pathlib.Path(__file__).resolve().parents[1] / "realtime.py").read_text()
+        ns = {"os": os}
+        start = src.index("def _private(")
+        exec(compile(ast.parse(src[start:src.index("FIRST_CLAUSE_MIN_CHARS")]), "realtime", "exec"), ns)
+        with patch.dict(os.environ, {"MINI_LOG_TRANSCRIPTS": ""}):
+            self.assertEqual(ns["_private"]("I feel sad today"), "[16 chars]")
+        with patch.dict(os.environ, {"MINI_LOG_TRANSCRIPTS": "1"}):
+            self.assertEqual(ns["_private"]("hi"), "'hi'")

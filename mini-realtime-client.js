@@ -181,6 +181,19 @@ export class MiniRealtimeSession {
         this.outputNode?.port.postMessage({type:'flush'});
         this.finishHeardResponse();
         break;
+      case 'session.queued':
+        // Mini is in another conversation; keep waiting (up to 15 minutes).
+        if (this.status !== 'authenticating') return;
+        clearTimeout(this.authTimeout);
+        this.authTimeout = setTimeout(()=>{
+          if (this.status === 'authenticating') this.fail(new Error('Mini is still busy. Please try again later.'));
+        },15*60*1000);
+        this.emit({type:'ui.queued',position:Number(event.position)||0,message:String(event.message||'').slice(0,200)});
+        break;
+      case 'session.ending':
+        this.emit({type:'ui.ending',reason:String(event.reason||'').slice(0,40),message:String(event.message||'').slice(0,200)});
+        this.stop();
+        break;
       case 'session.error':
         this.fail(new Error(String(event.message||'Voice session failed').slice(0,180)));
         break;
