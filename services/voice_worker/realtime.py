@@ -101,8 +101,8 @@ def _env_int(name: str, default: int) -> int:
 
 # Quick wins (2026-11-10): short spoken replies and a calmer end-of-turn.
 REPLY_TOKENS = _env_int("MINI_REPLY_TOKENS", 60)          # Ollama num_predict
-REPLY_MAX_SENTENCES = _env_int("MINI_REPLY_MAX_SENTENCES", 2)
-REPLY_MAX_CHARS = _env_int("MINI_REPLY_MAX_CHARS", 200)
+REPLY_MAX_SENTENCES = _env_int("MINI_REPLY_MAX_SENTENCES", 3)
+REPLY_MAX_CHARS = _env_int("MINI_REPLY_MAX_CHARS", 160)
 VAD_SILENCE_MS = _env_int("MINI_VAD_SILENCE_MS", 800)
 
 
@@ -166,6 +166,30 @@ async def fetch_user_context(access_token: str, user_id: str) -> list[str]:
 
 
 _LEARNING_TASKS: set = set()
+
+
+def live_whisper():
+    """The live speech-recognition model (created once). Caller holds STT_LOCK."""
+    model = engine._WHISPER
+    if model is None:
+        from faster_whisper import WhisperModel
+        hardware = "cuda" if torch.cuda.is_available() else "cpu"
+        model = WhisperModel(
+            os.environ.get("MINI_WHISPER_MODEL", "tiny.en"),
+            device=hardware,
+            compute_type="float16" if hardware == "cuda" else "int8",
+            cpu_threads=int(os.environ.get("MINI_CPU_THREADS", "6")),
+            num_workers=1,
+        )
+        engine._WHISPER = model
+    return model
+
+
+def warm_stt() -> None:
+    """Load and run speech recognition once so the first turn is not slow."""
+    with engine.STT_LOCK:
+        segments, _ = live_whisper().transcribe(np.zeros(16000, dtype=np.float32), beam_size=1, vad_filter=False)
+        list(segments)
 
 
 class SileroVADDetector:
@@ -504,21 +528,7 @@ class MiniRealtimeSession:
 
         def _do_stt():
             with engine.STT_LOCK:
-                model = engine._WHISPER
-                if model is None:
-                    # Initialize whisper model
-                    from faster_whisper import WhisperModel
-                    hardware = "cuda" if torch.cuda.is_available() else "cpu"
-                    model = WhisperModel(
-                        os.environ.get("MINI_WHISPER_MODEL", "tiny.en"),
-                        device=hardware,
-                        compute_type="float16" if hardware == "cuda" else "int8",
-                        cpu_threads=int(os.environ.get("MINI_CPU_THREADS", "6")),
-                        num_workers=1,
-                    )
-                    engine._WHISPER = model
-
-                segments, _ = model.transcribe(audio_samples, beam_size=1, vad_filter=False)
+                segments, _ = live_whisper().transcribe(audio_samples, beam_size=1, vad_filter=False)
                 return " ".join(seg.text.strip() for seg in segments).strip()
 
         transcript = await loop.run_in_executor(None, _do_stt)
@@ -658,10 +668,12 @@ class MiniRealtimeSession:
                                 timing["llm_first_token_ms"] = round((time.perf_counter() - t_start) * 1000)
                             full_reply.append(delta)
                             buffer += delta
-                            await self.send_json({"type": "response.text.delta", "response_id": response_id, "text": delta})
                             cut = split_clause(buffer, first=clauses_sent == 0)
                             if cut:
                                 clause, buffer = cut
+                                # On-screen text follows what Mini actually says (never cut-off words).
+                                await self.send_json({"type": "response.text.delta", "response_id": response_id,
+                                                      "text": (" " if clauses_sent else "") + clause})
                                 clauses.put_nowait(clause)
                                 clauses_sent += 1
                                 spoken.append(clause)
@@ -674,6 +686,8 @@ class MiniRealtimeSession:
             if capped:
                 full_reply = [" ".join(spoken)]
             elif buffer.strip() and response_id not in self.cancelled_response_ids:
+                await self.send_json({"type": "response.text.delta", "response_id": response_id,
+                                      "text": (" " if clauses_sent else "") + buffer.strip()})
                 clauses.put_nowait(buffer.strip())
             extra = engine.crisis_followup(user_transcript, "".join(full_reply))
             if extra and response_id not in self.cancelled_response_ids:

@@ -38,8 +38,9 @@ class ShortReplyTests(unittest.TestCase):
     def test_cap_two_sentences_or_chars(self):
         self.assertFalse(realtime.reply_is_complete(["Oh nice,"]))
         self.assertFalse(realtime.reply_is_complete(["Oh nice, that sounds fun."]))
-        self.assertTrue(realtime.reply_is_complete(["That sounds fun.", "What did you eat?"]))
-        self.assertTrue(realtime.reply_is_complete(["word " * 45]))
+        self.assertFalse(realtime.reply_is_complete(["That sounds fun.", "What did you eat?"]))
+        self.assertTrue(realtime.reply_is_complete(["Wow!", "That sounds fun.", "What did you eat?"]))
+        self.assertTrue(realtime.reply_is_complete(["word " * 35]))
 
     def test_end_of_turn_waits_longer(self):
         self.assertGreaterEqual(realtime.VAD_SILENCE_MS, 700)

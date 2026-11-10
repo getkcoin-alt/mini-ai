@@ -60,6 +60,13 @@ async def lifespan(_app: FastAPI):
             logger.info("Prepared %d acknowledgement clips in Mini's voice", made)
         except Exception as exc:
             logger.warning("Acknowledgement clips unavailable: %s", exc)
+    if os.environ.get("MINI_PRELOAD_STT", os.environ.get("MINI_PRELOAD_TTS", "0")) == "1":
+        try:
+            from . import realtime
+            await asyncio.get_running_loop().run_in_executor(None, realtime.warm_stt)
+            logger.info("Speech recognition warmed")
+        except Exception as exc:
+            logger.warning("Speech recognition warm-up unavailable: %s", exc)
     if os.environ.get("MINI_PRELOAD_LLM", "1") == "1":
         # Load the Ollama model now so the first live turn is not a cold start.
         try:
