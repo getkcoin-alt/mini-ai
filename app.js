@@ -4,8 +4,8 @@
  */
 import {
   configureMiniIdentity, miniIdentity, googleMiniLogin, sendEmailMiniOtp, verifyEmailMiniOtp,
-  signOutMini, readMiniProfile, saveMiniProfile, listMiniMemories, rememberMiniFact, forgetMiniFact,
-  deleteMiniAccount
+  signOutMini, readMiniProfile, saveMiniProfile, deleteMiniAccount,
+  mindConsents, setMindConsent, mindFacts, keepMindFact, rejectMindFact, forgetMindFact, tellMind, mindSyncScore
 } from './mini-supabase.js';
 import { MiniRealtimeSession } from './mini-realtime-client.js';
 
@@ -184,6 +184,7 @@ function renderStep() {
   if (step.last) {
     for (const [id, html] of [
       ['ob-consent', 'Remember my answers so Mini can get to know me. I can change or delete them anytime.'],
+      ['ob-learn', 'Let Mini learn from our conversations — your day, people and goals — so it truly gets to know you. You review everything in Memories.'],
       ['ob-terms', 'I agree to the <a href="/terms.html" target="_blank">Terms</a> and <a href="/privacy.html" target="_blank">Privacy Policy</a>.']]) {
       const label = document.createElement('label'); label.className = 'consent';
       const cb = document.createElement('input'); cb.type = 'checkbox'; cb.id = id;
@@ -219,6 +220,10 @@ async function nextStep(skip = false) {
     await saveMiniProfile({ name: d.name, miniName: d.miniName || 'Mini', relationship: d.relationship || 'friend',
       tone: d.tone || 'balanced', focus: d.focus || '', boundaries: d.boundaries || '', birthYear: d.birthYear }, true);
     state.profile = await readMiniProfile();
+    if ($('#ob-learn').checked) {
+      try { await setMindConsent('learn_from_conversations', true); await setMindConsent('proactive_followups', true); }
+      catch (error) { toast('Could not save the learning choice: ' + friendlyError(error)); }
+    }
     enterMain();
     setTimeout(() => toast("You're all set! Tap Mini whenever you want to talk."), 400);
   } catch (error) {
@@ -239,6 +244,20 @@ function enterMain() {
   setTalkState('idle');
   show('main');
   setTab('talk');
+  void refreshMind();
+}
+
+/* ---------- mind: sync %, learning consent ---------- */
+async function refreshMind() {
+  try {
+    const sync = await mindSyncScore();
+    if (sync && sync.score !== undefined && sync.score !== null) {
+      $('#sync-chip').textContent = 'Mini knows you ' + sync.score + '%';
+      $('#sync-chip').classList.remove('hidden');
+    }
+  } catch { /* mind not available yet */ }
+  try { $('#set-learn').checked = (await mindConsents()).has('learn_from_conversations'); }
+  catch { $('#set-learn').disabled = true; }
 }
 
 function setTab(name) {
@@ -291,6 +310,7 @@ async function preflight() {
   if (body.enabled) return;
   const reasons = {
     owner_only: "Mini's voice is opening to everyone very soon. Thanks for your patience!",
+    not_invited: 'Mini is in a private preview right now. Your invite is coming soon!',
     email_unconfirmed: 'Please confirm your email address first.',
     age_confirmation_required: 'Mini is for adults right now. Mini for kids is coming soon.',
     nfc_gateway_not_ready: "Mini's voice is resting for maintenance. Please try again shortly.",
@@ -325,6 +345,7 @@ function stopTalking() {
 function onTalkClosed() {
   state.session = null;
   releaseWakeLock();
+  setTimeout(() => void refreshMind(), 45000);   // Mini finishes learning shortly after a talk
   if ($('#orb').dataset.state !== 'idle') setTalkState('idle', 'Tap Mini to talk again.');
 }
 
@@ -372,26 +393,48 @@ function releaseWakeLock() {
   state.wakeLock = null;
 }
 
-/* ---------- memories ---------- */
-const KIND_LABEL = { fact: 'About me', preference: 'I like', goal: 'My goal', project: 'Working on' };
+/* ---------- memories (Mini's mind) ---------- */
+const GROUPS = ['Identity', 'Physical', 'Health', 'Personality', 'Emotions', 'Learning', 'Communication', 'Language & culture',
+  'Family', 'Relationships', 'Life history', 'Education', 'Skills', 'Career', 'Finances', 'Daily life', 'Interests',
+  'Likes', 'Values', 'Spirituality', 'Goals', 'Dreams', 'Worries', 'Motivation', 'Decisions', 'Surroundings',
+  'Digital life', 'Responsibilities', 'Experiences', 'How Mini helps'];
+function factItem(f, actions) {
+  const li = document.createElement('li'); li.className = 'mem-item' + (f.consent_status === 'pending' ? ' pending' : '');
+  const p = document.createElement('p');
+  const kind = document.createElement('span'); kind.className = 'mem-kind';
+  kind.textContent = (GROUPS[f.group_id - 1] || 'Memory') + ' · ' + f.attribute_name;
+  p.append(kind, document.createTextNode(f.value));
+  li.append(p, actions(li));
+  return li;
+}
 async function loadMemories() {
-  const list = $('#mem-list');
   try {
-    const items = await listMiniMemories();
-    list.replaceChildren(...items.map((m) => {
-      const li = document.createElement('li'); li.className = 'mem-item';
-      const p = document.createElement('p');
-      const kind = document.createElement('span'); kind.className = 'mem-kind'; kind.textContent = KIND_LABEL[m.kind] || 'Memory';
-      p.append(kind, document.createTextNode(m.content));
+    const { known, pending } = await mindFacts();
+    $('#noticed').classList.toggle('hidden', pending.length === 0);
+    $('#noticed-list').replaceChildren(...pending.map((f) => factItem(f, (li) => {
+      const row = document.createElement('div'); row.className = 'keep-actions';
+      const keep = document.createElement('button'); keep.type = 'button'; keep.className = 'btn btn-primary'; keep.textContent = 'Keep';
+      const no = document.createElement('button'); no.type = 'button'; no.className = 'btn btn-ghost'; no.textContent = 'Not true';
+      keep.addEventListener('click', async () => {
+        try { await keepMindFact(f.id); toast('Kept. Mini will remember.'); void loadMemories(); void refreshMind(); }
+        catch (error) { toast(friendlyError(error)); }
+      });
+      no.addEventListener('click', async () => {
+        try { await rejectMindFact(f.id); li.remove(); toast("Got it, Mini won't assume that."); void loadMemories(); }
+        catch (error) { toast(friendlyError(error)); }
+      });
+      row.append(keep, no);
+      return row;
+    })));
+    $('#mem-list').replaceChildren(...known.map((f) => factItem(f, (li) => {
       const del = document.createElement('button'); del.type = 'button'; del.className = 'mem-del';
       del.setAttribute('aria-label', 'Delete this memory'); del.textContent = '✕';
       del.addEventListener('click', async () => {
-        try { await forgetMiniFact(m.id); li.remove(); toast('Forgotten.'); checkEmpty(); }
+        try { await forgetMindFact(f.id); li.remove(); toast('Forgotten.'); checkEmpty(); void refreshMind(); }
         catch (error) { toast(friendlyError(error)); }
       });
-      li.append(p, del);
-      return li;
-    }));
+      return del;
+    })));
     checkEmpty();
   } catch (error) { toast('Could not load memories: ' + friendlyError(error)); }
 }
@@ -484,7 +527,7 @@ function bindStatic() {
     const text = $('#mem-text').value.trim();
     if (!text) return;
     try {
-      await rememberMiniFact({ kind: $('#mem-kind').value, content: text, consent: true });
+      await tellMind({ kind: $('#mem-kind').value, text });
       $('#mem-text').value = '';
       toast("Got it, I'll remember that.");
       void loadMemories();
@@ -509,6 +552,14 @@ function bindStatic() {
   });
 
   $('#set-captions').addEventListener('change', (e) => { state.prefs.captions = e.target.checked; savePrefs(); applyCaptions(); });
+  $('#set-learn').addEventListener('change', async (e) => {
+    const on = e.target.checked;
+    try {
+      await setMindConsent('learn_from_conversations', on);
+      await setMindConsent('proactive_followups', on);
+      toast(on ? 'Mini will learn from your talks.' : "Mini won't learn from new talks. What it knows stays until you delete it.");
+    } catch (error) { e.target.checked = !on; toast(friendlyError(error)); }
+  });
   $('#btn-signout').addEventListener('click', async () => {
     stopTalking();
     try { await signOutMini(); } catch (error) { toast(friendlyError(error)); }

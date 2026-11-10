@@ -8,7 +8,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 MIND = ROOT / "services" / "mind"
-DOC = (ROOT / "docs" / "HUMAN-INTELLIGENCE-DATABASE.md").read_text(encoding="utf-8")
+DOC_PATH = ROOT / "docs" / "HUMAN-INTELLIGENCE-DATABASE.md"
+DOC = DOC_PATH.read_text(encoding="utf-8") if DOC_PATH.exists() else ""
+
+
+def setUpModule():
+    if not DOC:
+        raise unittest.SkipTest("repo-only test: the owner's doc is not deployed to servers")
 
 
 def taxonomy():
