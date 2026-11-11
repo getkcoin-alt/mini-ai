@@ -44,24 +44,43 @@ def _wav16k(samples: np.ndarray) -> bytes:
     return buf.getvalue()
 
 
-async def transcribe(samples: np.ndarray, model: str = infra.STT_MODEL_DEFAULT) -> str:
-    """16 kHz float32 speech -> text via Groq Whisper."""
-    key = infra.secret(infra.STT_KEY)
-    if not infra.has(infra.STT_KEY):
-        raise ProviderError("stt key missing")
+REST_STATUSES = {401, 402, 403, 429}
+
+
+def _retry_after(resp) -> float | None:
     try:
-        async with httpx.AsyncClient(timeout=_timeout(10), trust_env=False) as client:
-            resp = await client.post(
-                infra.LLM_PROVIDERS["groq"]["base"] + "/audio/transcriptions",
-                headers={"Authorization": f"Bearer {key}"},
-                files={"file": ("speech.wav", _wav16k(samples), "audio/wav")},
-                data={"model": model, "language": "en", "response_format": "json", "temperature": "0"},
-            )
-    except httpx.HTTPError as exc:
-        raise ProviderError(type(exc).__name__) from None
-    if resp.status_code != 200:
-        raise ProviderError(f"stt http {resp.status_code}")
-    return str(resp.json().get("text") or "").strip()
+        return float(resp.headers.get("retry-after", ""))
+    except ValueError:
+        return None
+
+
+async def transcribe(samples: np.ndarray, model: str = infra.STT_MODEL_DEFAULT) -> str:
+    """16 kHz float32 speech -> text via Groq Whisper, rotating across Groq keys."""
+    keys = infra.usable_keys("groq")
+    if not keys:
+        raise ProviderError("no groq key available")
+    audio = _wav16k(samples)
+    last = "no groq key available"
+    async with httpx.AsyncClient(timeout=_timeout(10), trust_env=False) as client:
+        for name, key in keys:
+            try:
+                resp = await client.post(
+                    infra.LLM_PROVIDERS["groq"]["base"] + "/audio/transcriptions",
+                    headers={"Authorization": f"Bearer {key}"},
+                    files={"file": ("speech.wav", audio, "audio/wav")},
+                    data={"model": model, "language": "en", "response_format": "json", "temperature": "0"},
+                )
+            except httpx.HTTPError as exc:
+                last = f"stt {type(exc).__name__}"
+                continue
+            if resp.status_code == 200:
+                return str(resp.json().get("text") or "").strip()
+            last = f"stt http {resp.status_code}"
+            if resp.status_code in REST_STATUSES or resp.status_code >= 500:
+                infra.rest_key(name, resp.status_code, _retry_after(resp))
+                continue
+            break  # 400/404: wrong model or audio; another key will not help
+    raise ProviderError(last)
 
 
 def parse_sse_line(line: str) -> tuple[str, bool]:
@@ -81,30 +100,70 @@ def parse_sse_line(line: str) -> tuple[str, bool]:
     return delta, bool(choices[0].get("finish_reason"))
 
 
+class ModelError(ProviderError):
+    """This model cannot be used (missing, retired, bad request): skip it, keep the keys."""
+
+
 async def chat_stream(provider: str, model: str, messages: list[dict], *, max_tokens: int,
                       temperature: float = 0.6) -> AsyncIterator[str]:
-    """Stream reply text from an OpenAI-compatible provider."""
+    """Stream reply text from an OpenAI-compatible provider, rotating across its keys."""
     spec = infra.LLM_PROVIDERS.get(provider)
-    if not spec or not infra.has(spec["key"]):
-        raise ProviderError(f"{provider} key missing")
-    headers = {"Authorization": f"Bearer {infra.secret(spec['key'])}", "Content-Type": "application/json"}
-    if provider == "openrouter":
-        headers["X-Title"] = "Mini"
+    keys = infra.usable_keys(provider) if spec else []
+    if not keys:
+        raise ProviderError(f"no {provider} key available")
     body = {"model": model, "messages": messages, "stream": True, "max_tokens": max_tokens,
             "temperature": temperature}
-    try:
-        async with httpx.AsyncClient(timeout=_timeout(30), trust_env=False) as client:
-            async with client.stream("POST", spec["base"] + "/chat/completions", headers=headers, json=body) as resp:
-                if resp.status_code != 200:
-                    raise ProviderError(f"{provider} http {resp.status_code}")
-                async for line in resp.aiter_lines():
-                    delta, finished = parse_sse_line(line)
-                    if delta:
-                        yield delta
-                    if finished:
+    last = f"no {provider} key available"
+    async with httpx.AsyncClient(timeout=_timeout(30), trust_env=False) as client:
+        for name, key in keys:
+            headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+            if provider == "openrouter":
+                headers["X-Title"] = "Mini"
+            produced = False
+            try:
+                async with client.stream("POST", spec["base"] + "/chat/completions", headers=headers, json=body) as resp:
+                    if resp.status_code != 200:
+                        last = f"{provider} http {resp.status_code}"
+                        if resp.status_code in REST_STATUSES or resp.status_code >= 500:
+                            infra.rest_key(name, resp.status_code, _retry_after(resp))
+                            continue
+                        raise ModelError(f"{provider} {model} http {resp.status_code}")
+                    async for line in resp.aiter_lines():
+                        delta, finished = parse_sse_line(line)
+                        if delta:
+                            produced = True
+                            yield delta
+                        if finished:
+                            return
+                    if produced:
                         return
-    except httpx.HTTPError as exc:
-        raise ProviderError(f"{provider} {type(exc).__name__}") from None
+                    last = f"{provider} empty reply"
+            except httpx.HTTPError as exc:
+                if produced:
+                    raise ProviderError(f"{provider} {type(exc).__name__}") from None
+                last = f"{provider} {type(exc).__name__}"
+    raise ProviderError(last)
+
+
+async def chat_routed(plan: dict, messages: list[dict], *, max_tokens: int) -> AsyncIterator[str]:
+    """Free-model routing: chosen model -> lighter model -> other providers. Raises if all fail."""
+    route = infra.llm_route(plan)
+    if not route:
+        raise ProviderError("no api key for any provider")
+    last = "no route"
+    for provider, model in route:
+        produced = False
+        try:
+            async for delta in chat_stream(provider, model, messages, max_tokens=max_tokens):
+                produced = True
+                yield delta
+            return
+        except ProviderError as exc:
+            if produced:
+                raise
+            last = str(exc)
+            infra.record("route", "llm", f"{provider}/{model}"[:40], last)
+    raise ProviderError(last)
 
 
 class WavStreamDecoder:
@@ -196,23 +255,30 @@ async def speak_stream(text: str) -> AsyncIterator[np.ndarray]:
 RESEMBLE_API = "https://app.resemble.ai/api/v2"
 
 
-async def list_models(provider: str) -> list[dict]:
-    """Model ids the key can use (doubles as a key check). provider: groq|gemini|openrouter|resemble."""
+async def list_models(provider: str, slot: str | None = None) -> list[dict]:
+    """Model ids a key can use (doubles as a key check). provider: groq|gemini|openrouter|resemble."""
     if provider == "resemble":
         if not infra.has("MINI_RESEMBLE_API_KEY"):
             raise ProviderError("resemble key missing")
-        url, headers = RESEMBLE_API + "/voices", {"Authorization": f"Bearer {infra.secret('MINI_RESEMBLE_API_KEY')}"}
+        url, key = RESEMBLE_API + "/voices", infra.secret("MINI_RESEMBLE_API_KEY")
         params = {"page": 1, "page_size": 100}
     else:
         spec = infra.LLM_PROVIDERS.get(provider)
         if not spec:
             raise ProviderError("unknown provider")
-        if not infra.has(spec["key"]):
+        keys = dict(infra.provider_keys(provider))
+        if slot:
+            if slot not in keys:
+                raise ProviderError("that key is not added")
+            key = keys[slot]
+        elif keys:
+            key = next(iter(keys.values()))
+        else:
             raise ProviderError(f"{provider} key missing")
-        url, headers, params = spec["base"] + "/models", {"Authorization": f"Bearer {infra.secret(spec['key'])}"}, None
+        url, params = spec["base"] + "/models", None
     try:
         async with httpx.AsyncClient(timeout=_timeout(10), trust_env=False) as client:
-            resp = await client.get(url, headers=headers, params=params)
+            resp = await client.get(url, headers={"Authorization": f"Bearer {key}"}, params=params)
     except httpx.HTTPError as exc:
         raise ProviderError(f"{provider} {type(exc).__name__}") from None
     if resp.status_code != 200:
@@ -234,6 +300,10 @@ def parse_model_list(provider: str, payload) -> list[dict]:
         if provider == "gemini" and mid.startswith("models/"):
             mid = mid[len("models/"):]
         if mid:
+            pricing = row.get("pricing") or {}
+            free = (mid.endswith(":free") or mid == "openrouter/free"
+                    or (str(pricing.get("prompt")) in ("0", "0.0") and str(pricing.get("completion")) in ("0", "0.0")))
             items.append({"id": mid[:120], "name": str(row.get("name") or mid)[:120],
-                          "kind": "speech" if "whisper" in mid.lower() else "chat"})
+                          "kind": "speech" if "whisper" in mid.lower() else "chat",
+                          "free": bool(free) if provider == "openrouter" else True})
     return sorted(items, key=lambda r: r["id"])[:400]

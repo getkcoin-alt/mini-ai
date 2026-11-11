@@ -35,10 +35,16 @@ LLM_PROVIDERS = {
     "groq": {"base": "https://api.groq.com/openai/v1", "key": "MINI_GROQ_API_KEY",
              "model": "llama-3.3-70b-versatile"},
     "gemini": {"base": "https://generativelanguage.googleapis.com/v1beta/openai", "key": "MINI_GEMINI_API_KEY",
-               "model": "gemini-2.5-flash"},
+               "model": "gemini-2.5-flash-lite"},
+    # OpenRouter's own router picks a currently-working free model for each request.
     "openrouter": {"base": "https://openrouter.ai/api/v1", "key": "MINI_OPENROUTER_API_KEY",
-                   "model": "meta-llama/llama-3.3-70b-instruct"},
+                   "model": "openrouter/free"},
 }
+# Free models only (owner decision 2026-11-10). When the chosen model is rate
+# limited on every key, try this lighter free model at the same provider first.
+LIGHT_MODEL = {"groq": "llama-3.1-8b-instant"}
+KEYS_PER_PROVIDER = 5  # e.g. several free Groq accounts: when one runs out, the next takes over
+PROVIDER_ORDER = ("groq", "gemini", "openrouter")
 STT_KEY = "MINI_GROQ_API_KEY"
 STT_MODEL_DEFAULT = "whisper-large-v3-turbo"
 TTS_KEYS = ("MINI_RESEMBLE_API_KEY", "MINI_RESEMBLE_VOICE_UUID")
@@ -47,10 +53,15 @@ _MODEL_RE = re.compile(r"^[A-Za-z0-9._:/-]{1,100}$")
 _EMAIL_RE = re.compile(r"^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$")
 
 # Everything the admin may set from the card (values never leave the worker).
+def _slot(base: str, n: int) -> str:
+    return base if n == 1 else f"{base}_{n}"
+
+
 SECRET_NAMES = {
-    "MINI_GROQ_API_KEY": {"label": "Groq API key", "secret": True},
-    "MINI_GEMINI_API_KEY": {"label": "Gemini API key", "secret": True},
-    "MINI_OPENROUTER_API_KEY": {"label": "OpenRouter API key", "secret": True},
+    **{_slot(p["key"], n): {"label": f"{label} key {n}", "secret": True, "provider": name}
+       for name, label, p in (("groq", "Groq", LLM_PROVIDERS["groq"]), ("gemini", "Gemini", LLM_PROVIDERS["gemini"]),
+                              ("openrouter", "OpenRouter", LLM_PROVIDERS["openrouter"]))
+       for n in range(1, KEYS_PER_PROVIDER + 1)},
     "MINI_RESEMBLE_API_KEY": {"label": "Resemble API key", "secret": True},
     "MINI_RESEMBLE_VOICE_UUID": {"label": "Mini's voice id at Resemble", "secret": False},
     "MINI_RESEMBLE_PROJECT_UUID": {"label": "Resemble project id (optional)", "secret": False},
@@ -150,7 +161,8 @@ def key_summary() -> dict:
     for name, meta in SECRET_NAMES.items():
         value = secret(name)
         source = "admin" if stored.get(name) else ("server" if os.environ.get(name, "").strip() else None)
-        entry = {"label": meta["label"], "set": bool(value), "source": source}
+        entry = {"label": meta["label"], "set": bool(value), "source": source,
+                 "provider": meta.get("provider", "resemble")}
         if value:
             entry["hint"] = ("…" + value[-4:]) if meta["secret"] else value
         out[name] = entry
@@ -221,11 +233,61 @@ def save(raw, *, by: str = "") -> dict:
     return clean
 
 
+def provider_keys(provider: str) -> list[tuple[str, str]]:
+    """(slot name, key) for every key added for this provider, in slot order."""
+    base = LLM_PROVIDERS[provider]["key"]
+    out = []
+    for n in range(1, KEYS_PER_PROVIDER + 1):
+        name = _slot(base, n)
+        if has(name):
+            out.append((name, secret(name)))
+    return out
+
+
+# Key health: a key that hit its limit rests, the next one is used meanwhile.
+_cooling: dict[str, tuple[float, str]] = {}
+_turn: dict[str, int] = {}
+
+
+def usable_keys(provider: str) -> list[tuple[str, str]]:
+    """Healthy keys, rotated so load spreads across accounts (per-minute limits)."""
+    now = time.monotonic()
+    with _lock:
+        keys = [k for k in provider_keys(provider) if _cooling.get(k[0], (0, ""))[0] <= now]
+        if not keys:
+            return []
+        start = _turn.get(provider, 0) % len(keys)
+        _turn[provider] = start + 1
+    return keys[start:] + keys[:start]
+
+
+def rest_key(name: str, status: int, retry_after: float | None = None) -> None:
+    """Let a key rest after a limit or auth failure (the value is never recorded)."""
+    if status == 429:
+        seconds, why = min(max(retry_after or 60.0, 5.0), 3600.0), "rate limited"
+    elif status in (401, 403):
+        seconds, why = 3600.0, "refused (check the key)"
+    elif status == 402:
+        seconds, why = 6 * 3600.0, "out of credit"
+    else:
+        seconds, why = 30.0, f"error {status}"
+    with _lock:
+        _cooling[name] = (time.monotonic() + seconds, why)
+    record("key", "resting", SECRET_NAMES.get(name, {}).get("label", "key"), why)
+
+
+def key_health() -> dict:
+    now = time.monotonic()
+    with _lock:
+        return {name: {"resting_seconds": int(until - now), "why": why}
+                for name, (until, why) in _cooling.items() if until > now}
+
+
 def readiness() -> dict:
     """Which API stages have their keys (values are never returned)."""
     return {
-        "stt": has(STT_KEY),
-        "llm": {name: has(p["key"]) for name, p in LLM_PROVIDERS.items()},
+        "stt": bool(provider_keys("groq")),
+        "llm": {name: bool(provider_keys(name)) for name in LLM_PROVIDERS},
         "tts": all(has(k) for k in TTS_KEYS),
     }
 
@@ -244,7 +306,8 @@ def resolve(email: str | None, settings: dict | None = None) -> dict:
     return {
         "chosen": choice["mode"],
         "stt": "api" if api and ready["stt"] else "local",
-        "llm": "api" if api and ready["llm"][provider] else "local",
+        # any provider with a key is enough: replies route across providers
+        "llm": "api" if api and any(ready["llm"].values()) else "local",
         "tts": "api" if api and ready["tts"] else "local",
         "llm_provider": provider,
         "llm_model": model,
@@ -255,7 +318,23 @@ def resolve(email: str | None, settings: dict | None = None) -> dict:
 
 def api_fully_ready(plan: dict) -> bool:
     ready = readiness()
-    return ready["stt"] and ready["llm"].get(plan["llm_provider"], False) and ready["tts"]
+    return ready["stt"] and any(ready["llm"].values()) and ready["tts"]
+
+
+def llm_route(plan: dict) -> list[tuple[str, str]]:
+    """(provider, model) attempts for one reply: chosen model, lighter free model, other providers."""
+    ready = readiness()["llm"]
+    first = plan["llm_provider"]
+    route = []
+    if ready.get(first):
+        route.append((first, plan.get("llm_model") or LLM_PROVIDERS[first]["model"]))
+        light = LIGHT_MODEL.get(first)
+        if light and light != route[0][1]:
+            route.append((first, light))
+    for name in PROVIDER_ORDER:
+        if name != first and ready.get(name):
+            route.append((name, LLM_PROVIDERS[name]["model"]))
+    return route
 
 
 def as_api(plan: dict) -> dict:
@@ -306,7 +385,8 @@ def status() -> dict:
     with _lock:
         events = list(_events)[::-1]
         active = _api_sessions
-    return {"settings": load(), "readiness": readiness(), "keys": key_summary(), "providers": {
+    return {"settings": load(), "readiness": readiness(), "keys": key_summary(), "key_health": key_health(),
+            "providers": {
         name: {"default_model": p["model"]} for name, p in LLM_PROVIDERS.items()},
         "stt_model": load()["default"].get("stt_model") or STT_MODEL_DEFAULT,
         "api_sessions": active, "api_max_sessions": max_api_sessions(), "events": events}

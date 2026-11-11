@@ -57,7 +57,8 @@ export default async function handler(req, res, { fetchImpl = fetch, worker = ca
     }
     if (action === 'models') {
       if (typeof body.provider !== 'string') return res.status(422).json({ error: 'provider required' });
-      return res.status(200).json(await worker('admin/models', { method: 'POST', body: { provider: body.provider }, timeoutMs: 15000 }));
+      const slot = typeof body.slot === 'string' ? body.slot : undefined;
+      return res.status(200).json(await worker('admin/models', { method: 'POST', body: { provider: body.provider, ...(slot ? { slot } : {}) }, timeoutMs: 15000 }));
     }
     return res.status(422).json({ error: 'unknown action' });
   } catch (error) {

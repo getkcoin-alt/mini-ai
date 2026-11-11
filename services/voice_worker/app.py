@@ -333,7 +333,8 @@ async def admin_infra_models(request: Request):
         provider = str(body.get("provider") or "") if isinstance(body, dict) else ""
         if provider not in (*infra.LLM_PROVIDERS, "resemble"):
             raise infra.SettingsError("unknown provider")
-        models = await cloud.list_models(provider)
+        slot = body.get("slot") if isinstance(body.get("slot"), str) else None
+        models = await cloud.list_models(provider, slot)
     except (ValueError, infra.SettingsError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)[:180]) from None
     except cloud.ProviderError as exc:

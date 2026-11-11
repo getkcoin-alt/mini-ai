@@ -286,6 +286,15 @@ class MiniRealtimeSession:
         self.plan: dict = {"chosen": "local", "stt": "local", "llm": "local", "tts": "local",
                            "llm_provider": "groq", "llm_model": "", "overridden": False}
         self.holds_api_slot = False
+        self.api_paused_until: dict[str, float] = {}
+
+    def use_api(self, stage: str) -> bool:
+        """This stage runs on the API now (planned, and not resting after a failure)."""
+        return self.plan.get(stage) == "api" and time.monotonic() >= self.api_paused_until.get(stage, 0.0)
+
+    def pause_api(self, stage: str, seconds: float = 60.0) -> None:
+        """After a failure, use the local model for a minute instead of retrying every sentence."""
+        self.api_paused_until[stage] = time.monotonic() + seconds
 
     def owner_profile_facts(self) -> list[str]:
         """Facts allowed in this session's prompt.
@@ -561,12 +570,12 @@ class MiniRealtimeSession:
                 return " ".join(seg.text.strip() for seg in segments).strip()
 
         transcript = None
-        if self.plan["stt"] == "api":
+        if self.use_api("stt"):
             try:
                 transcript = await cloud.transcribe(audio_samples, self.plan.get("stt_model") or infra.STT_MODEL_DEFAULT)
             except cloud.ProviderError as exc:
                 infra.record("fallback", "stt", "groq", str(exc))
-                self.plan["stt"] = "local"  # stay local for the rest of this conversation
+                self.pause_api("stt")
         if transcript is None:
             transcript = await loop.run_in_executor(None, _do_stt)
         stt_ms = (time.perf_counter() - t0) * 1000
@@ -739,17 +748,16 @@ class MiniRealtimeSession:
 
     async def _llm_deltas(self, messages: list[dict], ollama_url: str):
         """Reply text deltas from the planned LLM; the local model if the API fails before speaking."""
-        if self.plan["llm"] == "api":
+        if self.use_api("llm"):
             produced = False
             try:
-                async for delta in cloud.chat_stream(self.plan["llm_provider"], self.plan["llm_model"], messages,
-                                                     max_tokens=REPLY_TOKENS):
+                async for delta in cloud.chat_routed(self.plan, messages, max_tokens=REPLY_TOKENS):
                     produced = True
                     yield delta
                 return
             except cloud.ProviderError as exc:
-                infra.record("fallback", "llm", self.plan["llm_provider"], str(exc))
-                self.plan["llm"] = "local"
+                infra.record("fallback", "llm", "local", str(exc))
+                self.pause_api("llm")
                 if produced:
                     return  # half a reply already spoken; do not start a second one
         async with httpx.AsyncClient(timeout=60.0, trust_env=False) as client:
@@ -823,7 +831,7 @@ class MiniRealtimeSession:
         is synthesized first.
         """
         loop = asyncio.get_running_loop()
-        if self.plan["tts"] == "api":
+        if self.use_api("tts"):
             produced = False
             try:
                 async for samples in cloud.speak_stream(clause):
@@ -834,7 +842,7 @@ class MiniRealtimeSession:
                 return
             except cloud.ProviderError as exc:
                 infra.record("fallback", "tts", "resemble", str(exc))
-                self.plan["tts"] = "local"
+                self.pause_api("tts")
                 if produced:
                     return
         if os.environ.get("MINI_STREAMING_TTS", "0") != "1":

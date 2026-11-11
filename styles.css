@@ -269,3 +269,4 @@ input:focus, textarea:focus, select:focus { border-color: var(--purple); }
 .adm-key > span small { display: block; color: var(--muted); font-size: .78rem; overflow-wrap: anywhere; }
 .adm-key .btn-text { grid-column: 1 / -1; justify-self: start; min-height: 32px; padding: 0; }
 .adm-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.adm-keys h4 { margin: 8px 0 0; font-size: .85rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
