@@ -331,7 +331,7 @@ async def admin_infra_models(request: Request):
     try:
         body = await request.json()
         provider = str(body.get("provider") or "") if isinstance(body, dict) else ""
-        if provider not in (*infra.LLM_PROVIDERS, "resemble"):
+        if provider not in (*infra.LLM_PROVIDERS, *infra.VOICE_KEYS):
             raise infra.SettingsError("unknown provider")
         slot = body.get("slot") if isinstance(body.get("slot"), str) else None
         models = await cloud.list_models(provider, slot)

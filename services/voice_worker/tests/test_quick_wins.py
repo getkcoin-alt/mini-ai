@@ -35,6 +35,16 @@ class AckTests(unittest.TestCase):
         with patch.dict(os.environ, {"MINI_ACKS": "0"}):
             self.assertIsNone(acks.pick("hello"))
 
+    def test_clips_never_cross_voices(self):
+        acks.warm(lambda text: (np.zeros(2400, dtype=np.float32), acks.OUTPUT_RATE))
+        hosted = "elevenlabs:AbCdEfGh12345678"
+        self.assertIsNone(acks.pick("I went to the market", hosted))  # server clips are not used for another voice
+        for text in acks.phrases():
+            acks.store(hosted, text, np.ones(2400, dtype=np.float32) * 0.5)
+        text, pcm = acks.pick("I went to the market", hosted)
+        self.assertGreater(max(np.frombuffer(pcm, dtype="<i2")), 0)
+        self.assertEqual(max(np.frombuffer(acks.pick("I went to the market")[1], dtype="<i2")), 0)
+
 
 class ShortReplyTests(unittest.TestCase):
     def test_cap_two_sentences_or_chars(self):

@@ -54,6 +54,39 @@ class InfraSettingsTests(unittest.TestCase):
             with self.assertRaises(infra.SettingsError):
                 infra.save(bad)
 
+    def test_voice_choice_elevenlabs_and_server(self):
+        el = {"MINI_ELEVENLABS_API_KEY": "sk_eleven_0000", "MINI_ELEVENLABS_VOICE_ID": "AbCdEfGh12345678"}
+        with patch.dict(os.environ, el):
+            infra._cooling.clear()
+            # ElevenLabs voice even while hearing/thinking stay on our server
+            infra.save({"default": {"mode": "local", "llm_provider": "groq", "voice": "elevenlabs"}, "users": {}})
+            plan = infra.resolve("a@b.co")
+            self.assertEqual((plan["llm"], plan["tts"], plan["tts_provider"]), ("local", "api", "elevenlabs"))
+            self.assertFalse(infra.uses_api(plan))  # local thinking still takes the local floor
+            self.assertTrue(infra.api_fully_ready(plan))
+            # out of credit: the key rests and new conversations use our server's voice
+            infra.rest_key("MINI_ELEVENLABS_API_KEY", 402)
+            self.assertEqual(infra.resolve("a@b.co")["tts"], "local")
+            self.assertFalse(infra.api_fully_ready(plan))
+            infra._cooling.clear()
+            # per-user: one tester on our server's voice, never switched to a hosted one when busy
+            infra.save({"default": {"mode": "api", "llm_provider": "groq"},
+                        "users": {"t@b.co": {"voice": "server"}}})
+            plan = infra.resolve("t@b.co")
+            self.assertEqual((plan["llm"], plan["tts"]), ("api", "local"))
+            self.assertFalse(infra.api_fully_ready(plan))
+            # auto keeps the old behaviour: API mode -> Resemble
+            plan = infra.resolve("other@b.co")
+            self.assertEqual((plan["tts"], plan["tts_provider"]), ("api", "resemble"))
+            self.assertTrue(infra.status()["readiness"]["voices"]["elevenlabs"])
+        with self.assertRaises(infra.SettingsError):
+            infra.save({"default": {"mode": "api", "llm_provider": "groq", "voice": "alexa"}})
+
+    def test_saved_settings_without_voice_still_load(self):
+        Path(os.environ["MINI_INFRA_FILE"]).write_text(
+            '{"default": {"mode": "api", "llm_provider": "groq", "llm_model": ""}, "users": {}}')
+        self.assertEqual(infra.resolve("a@b.co")["voice"], "auto")
+
     def test_status_never_contains_key_values(self):
         text = repr(infra.status())
         for name, value in KEYS.items():
@@ -160,6 +193,46 @@ class CloudParsingTests(unittest.TestCase):
             self.assertIn("MINI_GROQ_API_KEY", infra.key_health())
             infra._cooling.clear()
 
+    def test_elevenlabs_stream_and_out_of_credit(self):
+        import asyncio
+        import httpx
+        pcm = (np.ones(2401, dtype="<i2") * 16384).tobytes()
+        calls = []
+
+        def handler(request):
+            calls.append((request.url.path, request.url.params.get("output_format"), request.headers.get("xi-api-key")))
+            if len(calls) == 1:
+                return httpx.Response(200, content=pcm)
+            return httpx.Response(401, json={"detail": {"status": "quota_exceeded"}})
+
+        real = httpx.AsyncClient
+        env = {"MINI_ELEVENLABS_API_KEY": "sk_eleven_9999", "MINI_ELEVENLABS_VOICE_ID": "AbCdEfGh12345678"}
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.dict(os.environ, {"MINI_INFRA_FILE": tmp + "/infra.json", **env}), \
+                patch.object(cloud.httpx, "AsyncClient", lambda **kw: real(transport=httpx.MockTransport(handler))):
+            infra._cooling.clear()
+
+            async def speak():
+                return [s async for s in cloud.speak_stream("Hello there.", "elevenlabs")]
+            samples = np.concatenate(asyncio.run(speak()))
+            self.assertEqual(len(samples), 2401)
+            self.assertAlmostEqual(float(samples.mean()), 0.5, places=3)
+            self.assertEqual(calls[0], ("/v1/text-to-speech/AbCdEfGh12345678/stream", "pcm_24000", "sk_eleven_9999"))
+            with self.assertRaises(cloud.ProviderError) as err:
+                asyncio.run(speak())
+            self.assertIn("out of credit", str(err.exception))
+            self.assertEqual(infra.key_health()["MINI_ELEVENLABS_API_KEY"]["why"], "out of credit")
+            with self.assertRaises(cloud.ProviderError):  # resting: no request is made
+                asyncio.run(speak())
+            self.assertEqual(len(calls), 2)
+            infra._cooling.clear()
+
+    def test_pcm_decoder_keeps_odd_byte(self):
+        dec = cloud.PcmStreamDecoder()
+        raw = (np.arange(10, dtype="<i2") * 1000).tobytes()
+        out = [dec.feed(raw[:3]), dec.feed(raw[3:])]
+        self.assertEqual(len(np.concatenate([o for o in out if o is not None])), 10)
+
     def test_model_lists(self):
         groq = cloud.parse_model_list("groq", {"data": [{"id": "llama-3.3-70b-versatile"}, {"id": "whisper-large-v3-turbo"}]})
         self.assertEqual([m["kind"] for m in groq], ["chat", "speech"])
@@ -167,6 +240,10 @@ class CloudParsingTests(unittest.TestCase):
         self.assertEqual(gem[0]["id"], "gemini-2.5-flash")
         voices = cloud.parse_model_list("resemble", {"items": [{"uuid": "abc123", "name": "Mini"}, {"name": "no id"}]})
         self.assertEqual(voices, [{"id": "abc123", "name": "Mini"}])
+        eleven = cloud.parse_model_list("elevenlabs", {"voices": [
+            {"voice_id": "stock1", "name": "Aria", "category": "premade"},
+            {"voice_id": "mine1", "name": "Mini", "category": "cloned"}]})
+        self.assertEqual([(v["id"], v["mine"]) for v in eleven], [("mine1", True), ("stock1", False)])
         orr = cloud.parse_model_list("openrouter", {"data": [
             {"id": "x/paid", "pricing": {"prompt": "0.000001", "completion": "0.000002"}},
             {"id": "y/model:free", "pricing": {"prompt": "0", "completion": "0"}}]})

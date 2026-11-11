@@ -3,7 +3,8 @@
 - hearing: Groq Whisper (OpenAI-compatible /audio/transcriptions)
 - thinking: Groq / Gemini / OpenRouter (OpenAI-compatible streaming chat)
 - voice: hosted Chatterbox at Resemble, cloned from Mini's same reference clip,
-  streamed as PCM and converted to the 24 kHz Mini plays everywhere.
+  streamed as PCM and converted to the 24 kHz Mini plays everywhere; or
+  ElevenLabs (a voice from the admin's My Voices), streamed as raw 24 kHz PCM.
 
 Keys come only from the worker environment; they are never logged or returned.
 Transcripts and replies are never logged here either.
@@ -13,6 +14,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import re
 import struct
 import wave
 from typing import AsyncIterator
@@ -227,8 +229,72 @@ class WavStreamDecoder:
         return np.interp(np.linspace(0, len(samples) - 1, n), np.arange(len(samples)), samples).astype(np.float32)
 
 
-async def speak_stream(text: str) -> AsyncIterator[np.ndarray]:
-    """Mini's voice for `text` from hosted Chatterbox, as 24 kHz float32 chunks."""
+class PcmStreamDecoder:
+    """Raw little-endian PCM16 (any chunking) -> float32, keeping an odd byte for the next chunk."""
+
+    def __init__(self):
+        self.carry = b""
+
+    def feed(self, chunk: bytes) -> np.ndarray | None:
+        data = self.carry + chunk
+        usable = len(data) - (len(data) % 2)
+        self.carry = data[usable:]
+        if not usable:
+            return None
+        return np.frombuffer(data[:usable], dtype="<i2").astype(np.float32) / 32768.0
+
+
+ELEVENLABS_API = "https://api.elevenlabs.io"
+ELEVENLABS_MODEL = "eleven_flash_v2_5"  # their fastest model; costs half a credit per character
+
+
+def _elevenlabs_status(status: int, body: bytes) -> int:
+    """ElevenLabs reports an empty quota as 401 "quota_exceeded": treat that as out of credit."""
+    if status == 401 and b"quota_exceeded" in body[:2000]:
+        return 402
+    return status
+
+
+async def speak_stream(text: str, provider: str = "resemble") -> AsyncIterator[np.ndarray]:
+    """Mini's voice for `text` from the chosen hosted voice, as 24 kHz float32 chunks."""
+    if provider == "elevenlabs":
+        async for samples in _elevenlabs_stream(text):
+            yield samples
+        return
+    async for samples in _resemble_stream(text):
+        yield samples
+
+
+async def _elevenlabs_stream(text: str) -> AsyncIterator[np.ndarray]:
+    if not infra.voice_ready("elevenlabs"):
+        raise ProviderError("elevenlabs key missing or resting")
+    voice_id = infra.secret("MINI_ELEVENLABS_VOICE_ID")
+    if not re.match(r"^[A-Za-z0-9]{8,64}$", voice_id):
+        raise ProviderError("elevenlabs voice id looks wrong")
+    model = os.environ.get("MINI_ELEVENLABS_MODEL", ELEVENLABS_MODEL)
+    decoder = PcmStreamDecoder()
+    try:
+        async with httpx.AsyncClient(timeout=_timeout(20), trust_env=False) as client:
+            async with client.stream(
+                    "POST", f"{ELEVENLABS_API}/v1/text-to-speech/{voice_id}/stream",
+                    params={"output_format": "pcm_24000"},
+                    json={"text": text[:600], "model_id": model},
+                    headers={"xi-api-key": infra.secret("MINI_ELEVENLABS_API_KEY"),
+                             "Content-Type": "application/json"}) as resp:
+                if resp.status_code != 200:
+                    status = _elevenlabs_status(resp.status_code, await resp.aread())
+                    if status in REST_STATUSES or status >= 500:
+                        infra.rest_key("MINI_ELEVENLABS_API_KEY", status, _retry_after(resp))
+                    raise ProviderError("elevenlabs out of credit" if status == 402 else f"elevenlabs http {status}")
+                async for chunk in resp.aiter_bytes(4800):
+                    out = decoder.feed(chunk)
+                    if out is not None and len(out):
+                        yield out
+    except httpx.HTTPError as exc:
+        raise ProviderError(f"elevenlabs {type(exc).__name__}") from None
+
+
+async def _resemble_stream(text: str) -> AsyncIterator[np.ndarray]:
     if not all(infra.has(k) for k in infra.TTS_KEYS):
         raise ProviderError("tts key missing")
     url = os.environ.get("MINI_RESEMBLE_STREAM_URL", "https://f.cluster.resemble.ai/stream")
@@ -256,7 +322,20 @@ RESEMBLE_API = "https://app.resemble.ai/api/v2"
 
 
 async def list_models(provider: str, slot: str | None = None) -> list[dict]:
-    """Model ids a key can use (doubles as a key check). provider: groq|gemini|openrouter|resemble."""
+    """Model ids a key can use (doubles as a key check). provider: groq|gemini|openrouter|resemble|elevenlabs."""
+    if provider == "elevenlabs":
+        if not infra.has("MINI_ELEVENLABS_API_KEY"):
+            raise ProviderError("elevenlabs key missing")
+        try:
+            async with httpx.AsyncClient(timeout=_timeout(10), trust_env=False) as client:
+                resp = await client.get(ELEVENLABS_API + "/v1/voices",
+                                        headers={"xi-api-key": infra.secret("MINI_ELEVENLABS_API_KEY")})
+        except httpx.HTTPError as exc:
+            raise ProviderError(f"elevenlabs {type(exc).__name__}") from None
+        if resp.status_code != 200:
+            raise ProviderError(f"elevenlabs http {resp.status_code}"
+                                + (" (the key needs the Voices read permission)" if resp.status_code in (401, 403) else ""))
+        return parse_model_list(provider, resp.json())
     if provider == "resemble":
         if not infra.has("MINI_RESEMBLE_API_KEY"):
             raise ProviderError("resemble key missing")
@@ -288,6 +367,14 @@ async def list_models(provider: str, slot: str | None = None) -> list[dict]:
 
 def parse_model_list(provider: str, payload) -> list[dict]:
     items = []
+    if provider == "elevenlabs":
+        # "My Voices" (cloned, designed, saved) first; ElevenLabs' stock voices after.
+        for row in (payload or {}).get("voices") or []:
+            if isinstance(row, dict) and row.get("voice_id"):
+                category = str(row.get("category") or "")
+                items.append({"id": str(row["voice_id"])[:64], "name": str(row.get("name") or row["voice_id"])[:80],
+                              "mine": category != "premade"})
+        return sorted(items, key=lambda r: (not r["mine"], r["name"].lower()))[:200]
     rows = (payload or {}).get("items") if provider == "resemble" else (payload or {}).get("data")
     for row in rows or []:
         if not isinstance(row, dict):

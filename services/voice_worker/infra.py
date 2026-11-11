@@ -8,6 +8,11 @@ limits are identical in both modes.
   api    Groq Whisper (hearing) + Groq / Gemini / OpenRouter (thinking) +
          hosted Chatterbox with Mini's same voice (Resemble)
 
+Mini's voice is its own choice ("voice"): auto (follows the mode: Resemble in
+API mode), server (always our Chatterbox), elevenlabs or resemble (that hosted
+voice even when hearing/thinking stay on our server). A hosted voice that runs
+out of credit or fails falls back to our server's voice.
+
 Each stage falls back on its own: an API stage that is not configured or
 fails uses the local model, and a local-mode session that would have to wait
 for the busy local floor runs on the API instead (when the API is ready).
@@ -48,6 +53,8 @@ PROVIDER_ORDER = ("groq", "gemini", "openrouter")
 STT_KEY = "MINI_GROQ_API_KEY"
 STT_MODEL_DEFAULT = "whisper-large-v3-turbo"
 TTS_KEYS = ("MINI_RESEMBLE_API_KEY", "MINI_RESEMBLE_VOICE_UUID")
+VOICE_KEYS = {"resemble": TTS_KEYS, "elevenlabs": ("MINI_ELEVENLABS_API_KEY", "MINI_ELEVENLABS_VOICE_ID")}
+VOICES = ("auto", "server", "elevenlabs", "resemble")
 MAX_OVERRIDES = 100
 _MODEL_RE = re.compile(r"^[A-Za-z0-9._:/-]{1,100}$")
 _EMAIL_RE = re.compile(r"^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$")
@@ -65,6 +72,9 @@ SECRET_NAMES = {
     "MINI_RESEMBLE_API_KEY": {"label": "Resemble API key", "secret": True},
     "MINI_RESEMBLE_VOICE_UUID": {"label": "Mini's voice id at Resemble", "secret": False},
     "MINI_RESEMBLE_PROJECT_UUID": {"label": "Resemble project id (optional)", "secret": False},
+    # One account only: rotating several free accounts breaks ElevenLabs' terms.
+    "MINI_ELEVENLABS_API_KEY": {"label": "ElevenLabs API key", "secret": True, "provider": "elevenlabs"},
+    "MINI_ELEVENLABS_VOICE_ID": {"label": "Mini's voice id at ElevenLabs", "secret": False, "provider": "elevenlabs"},
 }
 _VALUE_RE = re.compile(r"^[A-Za-z0-9._:/+=-]{8,400}$")
 
@@ -186,6 +196,10 @@ def _clean_choice(raw, *, partial: bool) -> dict:
         if stt and not _MODEL_RE.match(stt):
             raise SettingsError("stt_model has unexpected characters")
         out["stt_model"] = stt
+    if raw.get("voice") not in (None, ""):
+        if raw["voice"] not in VOICES:
+            raise SettingsError("voice must be one of " + ", ".join(VOICES))
+        out["voice"] = raw["voice"]
     if "llm_model" in raw or not partial:
         model = str(raw.get("llm_model") or "").strip()
         if model and not _MODEL_RE.match(model):
@@ -283,12 +297,22 @@ def key_health() -> dict:
                 for name, (until, why) in _cooling.items() if until > now}
 
 
+def voice_ready(provider: str) -> bool:
+    """A hosted voice has its key + voice id, and the key is not resting."""
+    keys = VOICE_KEYS.get(provider)
+    if not keys or not all(has(k) for k in keys):
+        return False
+    with _lock:
+        return _cooling.get(keys[0], (0, ""))[0] <= time.monotonic()
+
+
 def readiness() -> dict:
     """Which API stages have their keys (values are never returned)."""
     return {
         "stt": bool(provider_keys("groq")),
         "llm": {name: bool(provider_keys(name)) for name in LLM_PROVIDERS},
-        "tts": all(has(k) for k in TTS_KEYS),
+        "tts": voice_ready("resemble"),
+        "voices": {name: voice_ready(name) for name in VOICE_KEYS},
     }
 
 
@@ -303,12 +327,17 @@ def resolve(email: str | None, settings: dict | None = None) -> dict:
     model = choice.get("llm_model") or LLM_PROVIDERS[provider]["model"]
     ready = readiness()
     api = choice["mode"] == "api"
+    voice = choice.get("voice") or "auto"
+    tts_provider = voice if voice in VOICE_KEYS else "resemble"
+    hosted_voice = (voice in VOICE_KEYS or (voice == "auto" and api)) and ready["voices"][tts_provider]
     return {
         "chosen": choice["mode"],
         "stt": "api" if api and ready["stt"] else "local",
         # any provider with a key is enough: replies route across providers
         "llm": "api" if api and any(ready["llm"].values()) else "local",
-        "tts": "api" if api and ready["tts"] else "local",
+        "tts": "api" if hosted_voice else "local",
+        "voice": voice,
+        "tts_provider": tts_provider,
         "llm_provider": provider,
         "llm_model": model,
         "stt_model": choice.get("stt_model") or STT_MODEL_DEFAULT,
@@ -318,7 +347,9 @@ def resolve(email: str | None, settings: dict | None = None) -> dict:
 
 def api_fully_ready(plan: dict) -> bool:
     ready = readiness()
-    return ready["stt"] and any(ready["llm"].values()) and ready["tts"]
+    if plan.get("voice") == "server":
+        return False  # the admin wants our server's voice: wait for it rather than switch voices
+    return ready["stt"] and any(ready["llm"].values()) and voice_ready(plan.get("tts_provider", "resemble"))
 
 
 def llm_route(plan: dict) -> list[tuple[str, str]]:
@@ -343,7 +374,8 @@ def as_api(plan: dict) -> dict:
 
 
 def uses_api(plan: dict) -> bool:
-    return plan["llm"] == "api" or plan["tts"] == "api"
+    """Runs without the local conversation floor (thinking happens on the API)."""
+    return plan["llm"] == "api"
 
 
 def max_api_sessions() -> int:

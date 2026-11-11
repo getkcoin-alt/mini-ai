@@ -192,6 +192,25 @@ def warm_stt() -> None:
         list(segments)
 
 
+
+_HOSTED_ACKS_WARMING: set[str] = set()
+
+
+async def _warm_hosted_acks(voice: str, provider: str) -> None:
+    """Prepare the acknowledgement clips once in a hosted voice (in the background)."""
+    try:
+        for text in acks.phrases():
+            if acks.ready(voice, text):
+                continue
+            parts = [samples async for samples in cloud.speak_stream(text, provider)]
+            if parts:
+                acks.store(voice, text, np.concatenate(parts))
+    except cloud.ProviderError as exc:
+        logger.info("Hosted acknowledgements not prepared (%s); the next session tries again", exc)
+    finally:
+        _HOSTED_ACKS_WARMING.discard(voice)
+
+
 class SileroVADDetector:
     def __init__(self, model):
         self.model = model
@@ -284,6 +303,7 @@ class MiniRealtimeSession:
         self.started_wall: datetime | None = None
         # Where this session's models run (super admin: local or api; see infra.py).
         self.plan: dict = {"chosen": "local", "stt": "local", "llm": "local", "tts": "local",
+                           "voice": "auto", "tts_provider": "resemble",
                            "llm_provider": "groq", "llm_model": "", "overridden": False}
         self.holds_api_slot = False
         self.api_paused_until: dict[str, float] = {}
@@ -295,6 +315,14 @@ class MiniRealtimeSession:
     def pause_api(self, stage: str, seconds: float = 60.0) -> None:
         """After a failure, use the local model for a minute instead of retrying every sentence."""
         self.api_paused_until[stage] = time.monotonic() + seconds
+
+    def voice_key(self) -> str:
+        """Which voice speaks right now (acknowledgement clips must match it)."""
+        if not self.use_api("tts"):
+            return acks.SERVER
+        provider = self.plan.get("tts_provider", "resemble")
+        voice_id = infra.secret("MINI_ELEVENLABS_VOICE_ID" if provider == "elevenlabs" else "MINI_RESEMBLE_VOICE_UUID")
+        return f"{provider}:{voice_id}"
 
     def owner_profile_facts(self) -> list[str]:
         """Facts allowed in this session's prompt.
@@ -685,7 +713,11 @@ class MiniRealtimeSession:
         spoken: list[str] = []
         capped = False
         if not opening:
-            ack = acks.pick(user_transcript)
+            voice = self.voice_key()
+            ack = acks.pick(user_transcript, voice)
+            if voice != acks.SERVER and acks.enabled() and voice not in _HOSTED_ACKS_WARMING:
+                _HOSTED_ACKS_WARMING.add(voice)
+                asyncio.create_task(_warm_hosted_acks(voice, self.plan.get("tts_provider", "resemble")))
             if ack:
                 # A tiny "Mm-hmm"/"Oh nice!" in Mini's voice while the reply is made.
                 clauses.put_nowait(ack[1])
@@ -834,14 +866,14 @@ class MiniRealtimeSession:
         if self.use_api("tts"):
             produced = False
             try:
-                async for samples in cloud.speak_stream(clause):
+                async for samples in cloud.speak_stream(clause, self.plan.get("tts_provider", "resemble")):
                     if self.closed or response_id in self.cancelled_response_ids:
                         return
                     produced = True
                     yield samples
                 return
             except cloud.ProviderError as exc:
-                infra.record("fallback", "tts", "resemble", str(exc))
+                infra.record("fallback", "tts", self.plan.get("tts_provider", "resemble"), str(exc))
                 self.pause_api("tts")
                 if produced:
                     return
