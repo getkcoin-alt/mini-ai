@@ -73,3 +73,11 @@ test('keys and model lists go to the worker; key value never echoed by the gatew
   assert.equal(r.statusCode, 403);
   assert.equal(calls.length, 2);
 });
+
+test('admin card explains which voice Mini uses', async () => {
+  const { summarizePlan } = await import('../mini-admin.js');
+  const ready = { stt: true, llm: { groq: true }, tts: false, voices: { elevenlabs: true, resemble: false } };
+  assert.match(summarizePlan({ mode: 'local', llm_provider: 'groq', voice: 'elevenlabs' }, ready), /Ollama, ElevenLabs voice/);
+  assert.match(summarizePlan({ mode: 'api', llm_provider: 'groq', voice: 'auto' }, ready), /Resemble key \+ voice id/);
+  assert.match(summarizePlan({ mode: 'api', llm_provider: 'groq', voice: 'server' }, ready), /thinking, our server’s voice/);
+});

@@ -3,6 +3,9 @@
 // API keys live only on the worker; this page sees "key added: yes/no".
 
 const PROVIDERS = { groq: 'Groq', gemini: 'Gemini', openrouter: 'OpenRouter' };
+const VOICES = { auto: 'Follow the mode (API → Resemble)', server: 'Our server (Chatterbox)',
+  elevenlabs: 'ElevenLabs', resemble: 'Resemble' };
+const VOICE_NAMES = { elevenlabs: 'ElevenLabs', resemble: 'Resemble' };
 let current = null;
 
 function el(tag, attrs = {}, ...children) {
@@ -25,21 +28,30 @@ function option(value, label, selected) {
 function readyText(ok) { return ok ? 'key added' : 'no key yet'; }
 
 export function summarizePlan(choice, readiness) {
-  if (choice.mode !== 'api') return 'Local server: faster-whisper + Ollama + Chatterbox (as configured).';
+  const voice = choice.voice || 'auto';
+  const hosted = VOICE_NAMES[voice] || (voice === 'auto' && choice.mode === 'api' ? 'Resemble' : null);
+  const hostedKey = voice === 'elevenlabs' ? 'elevenlabs' : 'resemble';
+  const voiceReady = readiness.voices ? readiness.voices[hostedKey] : readiness.tts;
   const missing = [];
+  if (hosted && !voiceReady) missing.push('voice (' + hosted + ' key + voice id, or credit ran out)');
+  const voiceText = hosted && voiceReady ? hosted + ' voice' : 'our server’s voice';
+  if (choice.mode !== 'api') {
+    const base = 'Local server: faster-whisper + Ollama, ' + voiceText + '.';
+    return missing.length ? base + ' Not ready yet: ' + missing.join(', ') + '.' : base;
+  }
   if (!readiness.stt) missing.push('hearing (Groq key)');
   if (!readiness.llm?.[choice.llm_provider]) missing.push('thinking (' + PROVIDERS[choice.llm_provider] + ' key)');
-  if (!readiness.tts) missing.push('voice (Resemble key + voice id)');
   return missing.length
     ? 'API mode, but these stay on the local server until keys are added: ' + missing.join(', ') + '.'
-    : 'API mode: Groq hearing, ' + PROVIDERS[choice.llm_provider] + ' thinking, hosted Mini voice.';
+    : 'API mode: Groq hearing, ' + PROVIDERS[choice.llm_provider] + ' thinking, ' + voiceText + '.';
 }
 
 function keyRow(name, info, api, setMsg, health) {
-  const secret = !/UUID$/.test(name);
+  const secret = !/(UUID|VOICE_ID)$/.test(name);
   const input = el('input', { type: secret ? 'password' : 'text', autocomplete: 'off', spellcheck: 'false',
     maxlength: '400', placeholder: info.set ? 'Replace…' : (secret ? 'Paste key' : 'Paste id'), 'aria-label': info.label });
   if (name === 'MINI_RESEMBLE_VOICE_UUID') input.setAttribute('list', 'adm-voices');
+  if (name === 'MINI_ELEVENLABS_VOICE_ID') input.setAttribute('list', 'adm-el-voices');
   const rest = health?.[name];
   const state = el('small', {}, info.set
     ? 'Added ' + (info.hint || '') + (info.source === 'server' ? ' · from server file' : ' · added here') +
@@ -53,12 +65,14 @@ function keyRow(name, info, api, setMsg, health) {
     saveBtn.disabled = false;
   } }, 'Save');
   const row = el('div', { class: 'adm-key' }, el('span', {}, el('strong', {}, info.label), state), input, saveBtn);
-  if (info.set && PROVIDERS[info.provider]) {
+  const checkable = PROVIDERS[info.provider] || name === 'MINI_ELEVENLABS_API_KEY';
+  if (info.set && checkable) {
     row.append(el('button', { type: 'button', class: 'btn-text', onclick: async () => {
       state.textContent = 'Checking…';
       try {
-        const out = await api.post({ action: 'models', provider: info.provider, slot: name });
-        state.textContent = out.ok ? 'Works ✓ · ' + out.models.length + ' models' : 'Not working: ' + out.error;
+        const out = await api.post({ action: 'models', provider: info.provider, ...(PROVIDERS[info.provider] ? { slot: name } : {}) });
+        state.textContent = out.ok ? 'Works ✓ · ' + out.models.length + (PROVIDERS[info.provider] ? ' models' : ' voices')
+          : 'Not working: ' + out.error;
       } catch (err) { state.textContent = err.message; }
     } }, 'Check'));
   }
@@ -92,6 +106,11 @@ function render(root, data, api) {
   const chatList = el('datalist', { id: 'adm-chat-models' });
   const sttList = el('datalist', { id: 'adm-stt-models' });
   const voiceList = el('datalist', { id: 'adm-voices' });
+  const elVoiceList = el('datalist', { id: 'adm-el-voices' });
+  const voices = r.voices || { resemble: r.tts };
+  const voice = el('select', { id: 'adm-voice', 'aria-label': 'Mini’s voice' },
+    ...Object.entries(VOICES).map(([k, label]) => option(k,
+      label + (VOICE_NAMES[k] ? ' (' + (voices[k] ? 'ready' : 'not ready') + ')' : ''), (s.default.voice || 'auto') === k)));
   const model = el('input', { id: 'adm-model', type: 'text', maxlength: '100', autocomplete: 'off', list: 'adm-chat-models',
     placeholder: data.providers?.[s.default.llm_provider]?.default_model || 'default model' });
   model.value = s.default.llm_model || '';
@@ -100,10 +119,17 @@ function render(root, data, api) {
   stt.value = s.default.stt_model || '';
   const modelNote = el('small', { class: 'fine' });
   const loadModels = async (which) => {
-    modelNote.textContent = 'Loading ' + (PROVIDERS[which] || 'Resemble') + ' models…';
+    const label = PROVIDERS[which] || VOICE_NAMES[which];
+    modelNote.textContent = 'Loading ' + label + (PROVIDERS[which] ? ' models…' : ' voices…');
     try {
       const out = await api.post({ action: 'models', provider: which });
-      if (!out.ok) { modelNote.textContent = (PROVIDERS[which] || 'Resemble') + ': ' + out.error; return; }
+      if (!out.ok) { modelNote.textContent = label + ': ' + out.error; return; }
+      if (which === 'elevenlabs') {
+        fillList(elVoiceList, out.models.map((m) => ({ id: m.id, name: m.name + (m.mine ? ' · My Voices' : ' · stock') })));
+        const mine = out.models.filter((m) => m.mine).length;
+        modelNote.textContent = out.models.length + ' ElevenLabs voices loaded (' + mine + ' from My Voices): pick Mini’s voice in the ElevenLabs voice id box, then Save.';
+        return;
+      }
       if (which === 'resemble') { fillList(voiceList, out.models); modelNote.textContent = out.models.length + ' Resemble voices loaded: pick Mini’s voice in the voice id box.'; return; }
       const chat = out.models.filter((m) => m.kind !== 'speech' && m.free !== false);
       fillList(chatList, chat);
@@ -117,8 +143,9 @@ function render(root, data, api) {
     if (r.llm?.[provider.value]) loadModels(provider.value);
   });
   const plan = el('p', { class: 'fine', id: 'adm-plan' }, summarizePlan(s.default, r));
-  const refreshPlan = () => { plan.textContent = summarizePlan({ mode: mode.value, llm_provider: provider.value }, r); };
+  const refreshPlan = () => { plan.textContent = summarizePlan({ mode: mode.value, llm_provider: provider.value, voice: voice.value }, r); };
   mode.addEventListener('change', refreshPlan);
+  voice.addEventListener('change', refreshPlan);
   provider.addEventListener('change', refreshPlan);
 
   const users = el('div', { class: 'adm-users' });
@@ -126,8 +153,11 @@ function render(root, data, api) {
     const e = el('input', { type: 'email', placeholder: 'user@email.com', 'aria-label': 'User email', maxlength: '254' });
     e.value = email;
     const m = el('select', { 'aria-label': 'Infrastructure for this user' },
-      option('local', 'Local', choice.mode === 'local'), option('api', 'API', choice.mode !== 'local'));
-    const row = el('div', { class: 'adm-user' }, e, m,
+      option('', 'Default', !choice.mode), option('local', 'Local', choice.mode === 'local'), option('api', 'API', choice.mode === 'api'));
+    const v = el('select', { 'aria-label': 'Voice for this user' },
+      option('', 'Default voice', !choice.voice),
+      ...['server', 'elevenlabs', 'resemble'].map((k) => option(k, k === 'server' ? 'Server voice' : VOICE_NAMES[k], choice.voice === k)));
+    const row = el('div', { class: 'adm-user' }, e, m, v,
       el('button', { type: 'button', class: 'btn-text', 'aria-label': 'Remove override', onclick: () => row.remove() }, '✕'));
     users.append(row);
   };
@@ -136,11 +166,12 @@ function render(root, data, api) {
   const saveBtn = el('button', { type: 'button', class: 'btn btn-primary', onclick: async () => {
     const overrides = {};
     for (const row of users.querySelectorAll('.adm-user')) {
-      const [e, m] = row.querySelectorAll('input, select');
-      if (e.value.trim()) overrides[e.value.trim().toLowerCase()] = { mode: m.value };
+      const [e, m, v] = row.querySelectorAll('input, select');
+      const choice = { ...(m.value ? { mode: m.value } : {}), ...(v.value ? { voice: v.value } : {}) };
+      if (e.value.trim() && Object.keys(choice).length) overrides[e.value.trim().toLowerCase()] = choice;
     }
     const settings = { default: { mode: mode.value, llm_provider: provider.value, llm_model: model.value.trim(),
-      stt_model: stt.value.trim() }, users: overrides };
+      stt_model: stt.value.trim(), voice: voice.value }, users: overrides };
     saveBtn.disabled = true;
     setMsg('Saving…');
     try { await api.post({ action: 'settings', settings }); setMsg('Saved. New conversations use this right away.'); await api.refresh(); }
@@ -151,9 +182,10 @@ function render(root, data, api) {
   // One group per provider: every added key, plus one empty slot to add another.
   const keys = el('div', { class: 'adm-keys' });
   for (const [prov, title] of [['groq', 'Groq (hearing + thinking)'], ['gemini', 'Gemini (thinking)'],
-                               ['openrouter', 'OpenRouter (thinking)'], ['resemble', 'Resemble (Mini’s voice, paid)']]) {
+                               ['openrouter', 'OpenRouter (thinking)'], ['elevenlabs', 'ElevenLabs (voice, one account)'],
+                               ['resemble', 'Resemble (Mini’s voice, paid)']]) {
     const entries = Object.entries(data.keys || {}).filter(([, info]) => info.provider === prov);
-    const shown = prov === 'resemble' ? entries
+    const shown = VOICE_NAMES[prov] ? entries
       : [...entries.filter(([, i]) => i.set), ...entries.filter(([, i]) => !i.set).slice(0, 1)];
     keys.append(el('h4', {}, title), ...shown.map(([name, info]) => keyRow(name, info, api, setMsg, data.key_health)));
   }
@@ -172,19 +204,22 @@ function render(root, data, api) {
     el('label', { class: 'field' }, el('span', {}, 'Thinking provider (API mode)'), provider),
     el('label', { class: 'field' }, el('span', {}, 'Thinking model (blank = default)'), model, chatList),
     el('label', { class: 'field' }, el('span', {}, 'Hearing model at Groq (blank = default)'), stt, sttList),
+    el('label', { class: 'field' }, el('span', {}, 'Mini’s voice'), voice),
+    el('p', { class: 'fine' }, 'Mini has one voice. If the hosted voice is not made from the same clip as our server’s voice, she sounds different whenever she falls back (credit used up, provider down). ElevenLabs’ free plan is about 20 minutes of speech a month and is not for commercial use.'),
     el('div', { class: 'adm-actions' },
       el('button', { type: 'button', class: 'btn btn-ghost', onclick: () => loadModels(provider.value) }, 'Load models'),
-      el('button', { type: 'button', class: 'btn btn-ghost', onclick: () => loadModels('resemble') }, 'Load voices')),
+      el('button', { type: 'button', class: 'btn btn-ghost', onclick: () => loadModels('elevenlabs') }, 'Load ElevenLabs voices'),
+      el('button', { type: 'button', class: 'btn btn-ghost', onclick: () => loadModels('resemble') }, 'Load Resemble voices')),
     modelNote,
-    el('p', { class: 'fine' }, 'Hearing (' + readyText(r.stt) + ') · Voice: hosted Mini voice (' + readyText(r.tts) +
-      ') · API conversations now: ' + data.api_sessions + '/' + data.api_max_sessions),
+    el('p', { class: 'fine' }, 'Hearing (' + readyText(r.stt) + ') · Voices: ElevenLabs ' + (voices.elevenlabs ? 'ready' : 'not ready') +
+      ', Resemble ' + (voices.resemble ? 'ready' : 'not ready') + ' · API conversations now: ' + data.api_sessions + '/' + data.api_max_sessions),
     plan,
     el('div', { class: 'field' }, el('span', {}, 'Per-user overrides'), users,
       el('button', { type: 'button', class: 'btn btn-ghost', onclick: () => addUserRow() }, '+ Add user')),
     saveBtn,
     el('h3', {}, 'API keys'),
     el('p', { class: 'fine' }, 'Keys go straight to Mini’s private server and are never shown again, only the last 4 characters. Add up to 5 keys per provider: when one hits its free limit it rests and the next takes over. If every key of the chosen provider is resting, Mini uses a lighter free model, then the other providers, then our server.'),
-    keys, voiceList, msg,
+    keys, voiceList, elVoiceList, msg,
     el('p', { class: 'fine' }, 'If a choice fails, Mini falls back on her own: API → our server, busy server → API. Recent events:'),
     events.childElementCount ? events : el('p', { class: 'fine' }, 'No events yet.'),
   );

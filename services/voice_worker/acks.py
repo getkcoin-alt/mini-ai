@@ -5,6 +5,10 @@ with a small sound ("Mm-hmm", "Oh nice!"). These short clips are synthesized
 ONCE (at startup, in Mini's voice) and played within a moment of the person
 finishing, while the real reply is being made.
 
+Clips are kept per voice ("server", or e.g. "elevenlabs:<voice id>"), so the
+acknowledgement is always in the same voice as the reply that follows. Hosted
+voices are prepared on first use (about 120 characters, once per voice).
+
 Each clip is padded with silence to at least ACK_MIN_SECONDS so the browser's
 playback buffer (MINI playback pre-roll, ~0.9 s) starts it immediately.
 """
@@ -33,7 +37,8 @@ _SAD = re.compile(r"\b(sad|tired|stress\w*|anxious|worried|lonely|alone|hurt|cry
 _HAPPY = re.compile(r"\b(great|awesome|amazing|happy|excited|won|finished|passed|got the|promotion|love|yay|"
                     r"fantastic|good news|best|celebrat\w*|finally)\b", re.I)
 
-_CACHE: dict[str, bytes] = {}
+SERVER = "server"
+_CACHE: dict[tuple[str, str], bytes] = {}
 _LOCK = threading.Lock()
 _last: str | None = None
 
@@ -59,35 +64,47 @@ def _pcm(samples: np.ndarray) -> bytes:
     return (np.clip(samples, -1.0, 1.0) * 32767).astype("<i2").tobytes()
 
 
-def warm(synthesize) -> int:
+def phrases() -> list[str]:
+    return [text for group in ACKS.values() for text in group]
+
+
+def ready(voice: str, text: str) -> bool:
+    with _LOCK:
+        return (voice, text) in _CACHE
+
+
+def store(voice: str, text: str, samples) -> None:
+    with _LOCK:
+        _CACHE[(voice, text)] = _pcm(np.asarray(samples, dtype=np.float32))
+
+
+def warm(synthesize, voice: str = SERVER) -> int:
     """Synthesize every acknowledgement once. `synthesize(text) -> (samples, rate)`."""
     made = 0
-    for phrases in ACKS.values():
-        for text in phrases:
-            if text in _CACHE:
+    for text in phrases():
+        if ready(voice, text):
+            continue
+        try:
+            samples, rate = synthesize(text)
+            if rate != OUTPUT_RATE:
                 continue
-            try:
-                samples, rate = synthesize(text)
-                if rate != OUTPUT_RATE:
-                    continue
-                with _LOCK:
-                    _CACHE[text] = _pcm(np.asarray(samples, dtype=np.float32))
-                made += 1
-            except Exception as exc:  # never block a conversation on an ack
-                logger.warning("ack %r not prepared: %s", text, exc)
+            store(voice, text, samples)
+            made += 1
+        except Exception as exc:  # never block a conversation on an ack
+            logger.warning("ack %r not prepared: %s", text, exc)
     return made
 
 
-def pick(transcript: str) -> tuple[str, bytes] | None:
-    """A ready clip that fits what the person said (never the same twice in a row)."""
+def pick(transcript: str, voice: str = SERVER) -> tuple[str, bytes] | None:
+    """A ready clip in this voice that fits what the person said (never the same twice in a row)."""
     global _last
     if not enabled():
         return None
     with _LOCK:
-        options = [t for t in ACKS[category(transcript)] if t in _CACHE and t != _last] \
-            or [t for t in ACKS[category(transcript)] if t in _CACHE]
+        group = [t for t in ACKS[category(transcript)] if (voice, t) in _CACHE]
+        options = [t for t in group if t != _last] or group
         if not options:
             return None
         text = random.choice(options)
         _last = text
-        return text, _CACHE[text]
+        return text, _CACHE[(voice, text)]
