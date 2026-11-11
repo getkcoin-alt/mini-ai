@@ -255,3 +255,18 @@ input:focus, textarea:focus, select:focus { border-color: var(--purple); }
 .meet-icon { font-size: 1.4rem; }
 .meet-consents { display: grid; gap: 12px; margin: 14px 0 18px; }
 .meet-go { width: 100%; min-height: 58px; font-size: 1.08rem; }
+
+/* super admin */
+.admin-card { display: grid; gap: 12px; margin: 16px 0; padding: 16px; border-radius: 20px; border: 1px solid var(--line); background: var(--card); }
+.admin-card h3 { margin: 0; font-size: 1rem; }
+.adm-users { display: grid; gap: 8px; }
+.adm-user { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; }
+.adm-events { margin: 0; padding-left: 18px; color: var(--muted); font-size: .78rem; display: grid; gap: 4px; overflow-wrap: anywhere; }
+.admin-card[hidden] { display: none; }
+.adm-keys { display: grid; gap: 12px; }
+.adm-key { display: grid; grid-template-columns: 1fr auto; gap: 6px 8px; align-items: center; }
+.adm-key > span { grid-column: 1 / -1; }
+.adm-key > span small { display: block; color: var(--muted); font-size: .78rem; overflow-wrap: anywhere; }
+.adm-key .btn-text { grid-column: 1 / -1; justify-self: start; min-height: 32px; padding: 0; }
+.adm-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.adm-keys h4 { margin: 8px 0 0; font-size: .85rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }

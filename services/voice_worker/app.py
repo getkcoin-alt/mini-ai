@@ -22,7 +22,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import acks, engine, memory, resource_limits, ws_auth
+from . import acks, engine, infra, memory, resource_limits, ws_auth
 
 logger = logging.getLogger("mini.voice")
 # uvicorn leaves the root logger at WARNING; keep Mini's own INFO lines
@@ -285,6 +285,62 @@ def local_profile_save(data: ProfileSaveRequest):
 @app.delete("/api/voice/profile", dependencies=[Depends(local_auth)])
 def local_profile_delete():
     return safely(memory.delete_profile)
+
+
+# Super admin: where Mini's models run. Reached only through the Vercel
+# /api/admin/infra gateway, which checks the admin's Supabase session first.
+@app.get("/v1/admin/infra", dependencies=[Depends(worker_auth)])
+def admin_infra_status():
+    return infra.status()
+
+
+@app.post("/v1/admin/infra", dependencies=[Depends(worker_auth)])
+async def admin_infra_save(request: Request):
+    try:
+        body = await request.json()
+        saved = infra.save(body.get("settings") if isinstance(body, dict) else None,
+                           by=str(body.get("by") or "") if isinstance(body, dict) else "")
+    except (ValueError, infra.SettingsError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)[:180]) from None
+    return {"saved": True, "settings": saved, "readiness": infra.readiness()}
+
+
+@app.post("/v1/admin/keys", dependencies=[Depends(worker_auth)])
+async def admin_infra_keys(request: Request):
+    """Add or remove a provider key. The value is stored, never echoed or logged."""
+    try:
+        body = await request.json()
+        if not isinstance(body, dict):
+            raise infra.SettingsError("body must be an object")
+        by = str(body.get("by") or "")
+        if body.get("action") == "remove":
+            infra.remove_secret(str(body.get("name") or ""), by=by)
+        elif body.get("action") == "set":
+            infra.set_secret(str(body.get("name") or ""), str(body.get("value") or ""), by=by)
+        else:
+            raise infra.SettingsError("action must be set or remove")
+    except (ValueError, infra.SettingsError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)[:180]) from None
+    return {"saved": True, "keys": infra.key_summary(), "readiness": infra.readiness()}
+
+
+@app.post("/v1/admin/models", dependencies=[Depends(worker_auth)])
+async def admin_infra_models(request: Request):
+    """Live model list for a provider (also proves the key works)."""
+    from . import cloud
+    try:
+        body = await request.json()
+        provider = str(body.get("provider") or "") if isinstance(body, dict) else ""
+        if provider not in (*infra.LLM_PROVIDERS, "resemble"):
+            raise infra.SettingsError("unknown provider")
+        slot = body.get("slot") if isinstance(body.get("slot"), str) else None
+        models = await cloud.list_models(provider, slot)
+    except (ValueError, infra.SettingsError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)[:180]) from None
+    except cloud.ProviderError as exc:
+        infra.record("key", "check failed", provider, str(exc))
+        return {"ok": False, "provider": provider, "error": str(exc)[:120], "models": []}
+    return {"ok": True, "provider": provider, "models": models}
 
 
 # Protected service-to-service routes. Never expose to anonymous public traffic.
